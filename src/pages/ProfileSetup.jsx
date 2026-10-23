@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
+import "./ProfileSetup.css";
 
 function ProfileSetup() {
   const navigate = useNavigate();

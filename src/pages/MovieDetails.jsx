@@ -1,169 +1,529 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import Navbar from "../components/Navbar";
 import API from "../services/api";
+import "./MovieDetails.css";
+
+const BACKEND_URL = "http://127.0.0.1:8000";
+
+function getMediaUrl(url) {
+  if (!url) return "";
+
+  if (/^https?:\/\//i.test(url)) return url;
+
+  return `${BACKEND_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+}
+
+function getMovieVideos(movie) {
+  const videos = [];
+
+  if (Array.isArray(movie?.quality_files)) {
+    movie.quality_files.forEach((item) => {
+      if (item.file) {
+        videos.push({
+          id: item.id || item.quality,
+          quality: item.quality || "Video",
+          url: getMediaUrl(item.file),
+        });
+      }
+    });
+  }
+
+  if (movie?.movie_file) {
+    const url = getMediaUrl(movie.movie_file);
+
+    if (!videos.some((item) => item.url === url)) {
+      videos.push({
+        id: "main",
+        quality: movie.quality === "FULL_HD" ? "Full HD" : "HD",
+        url,
+      });
+    }
+  }
+
+  return videos;
+}
+
+function formatTime(seconds) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+}
 
 function MovieDetails() {
-  const { id } = useParams();
   const navigate = useNavigate();
+  const { id } = useParams();
+
+  const playerRef = useRef(null);
+  const videoRef = useRef(null);
+  const pendingPosition = useRef(null);
+  const resumeAfterQualityChange = useRef(false);
 
   const [movie, setMovie] = useState(null);
+  const [videos, setVideos] = useState([]);
+  const [selectedVideoUrl, setSelectedVideoUrl] = useState("");
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [videoError, setVideoError] = useState("");
 
+  const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [volume, setVolume] = useState(1);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Load movie information.
   useEffect(() => {
-    const fetchMovie = async () => {
+    let cancelled = false;
+
+    async function loadMovie() {
+      setLoading(true);
+      setError("");
+      setVideoError("");
+      setMovie(null);
+      setVideos([]);
+      setSelectedVideoUrl("");
+
       try {
-        const token = localStorage.getItem("accessToken");
+        const response = await API.get(`/movies/${id}/`);
 
-        const response = await API.get(`/movies/${id}/`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        if (cancelled) return;
 
-        setMovie(response.data);
+        const data = response.data;
+        const availableVideos = getMovieVideos(data);
+
+        setMovie(data);
+        setVideos(availableVideos);
+        setSelectedVideoUrl(availableVideos[0]?.url || "");
+
+        if (availableVideos.length === 0) {
+          setVideoError("No video file is available for this movie.");
+        }
       } catch (err) {
+        if (cancelled) return;
+
         console.error("Movie details error:", err);
 
         setError(
-          err.response?.data?.message || "Unable to load movie details.",
+          err.response?.data?.detail ||
+            err.response?.data?.error ||
+            err.response?.data?.message ||
+            (err.response?.status === 401
+              ? "Please log in again."
+              : err.response?.status === 403
+                ? "You do not have permission to access this movie."
+                : "Unable to load this movie. Please try again.")
         );
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadMovie();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  // Track fullscreen state.
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+
+    return () => {
+      document.removeEventListener(
+        "fullscreenchange",
+        handleFullscreenChange
+      );
+    };
+  }, []);
+
+  // Clean up video.
+  useEffect(() => {
+    return () => {
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.removeAttribute("src");
+        videoRef.current.load();
+      }
+    };
+  }, []);
+
+  // Play or pause.
+  const togglePlay = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    try {
+      if (video.paused) {
+        await video.play();
+      } else {
+        video.pause();
+      }
+    } catch (err) {
+      console.error("Playback error:", err);
+      setVideoError(
+        "Unable to play this video. Check the file URL and format."
+      );
+    }
+  }, []);
+
+  // Skip forward or backward.
+  const skip = useCallback((seconds) => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const maxTime = Number.isFinite(video.duration)
+      ? video.duration
+      : video.currentTime + seconds;
+
+    video.currentTime = Math.max(
+      0,
+      Math.min(maxTime, video.currentTime + seconds)
+    );
+  }, []);
+
+  // Mute or unmute.
+  const toggleMute = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.muted = !video.muted;
+    setMuted(video.muted);
+
+    if (!video.muted && video.volume === 0) {
+      video.volume = 1;
+      setVolume(1);
+    }
+  }, []);
+
+  // Change volume.
+  const handleVolumeChange = (event) => {
+    const value = Number(event.target.value);
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.volume = value;
+    video.muted = value === 0;
+
+    setVolume(value);
+    setMuted(value === 0);
+  };
+
+  // Enter or exit fullscreen.
+  const toggleFullscreen = async () => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await player.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.error("Fullscreen error:", err);
+    }
+  };
+
+  // Change video quality while preserving playback position.
+  const changeQuality = (event) => {
+    const nextUrl = event.target.value;
+    if (!nextUrl || nextUrl === selectedVideoUrl) return;
+
+    const video = videoRef.current;
+
+    pendingPosition.current = video?.currentTime || 0;
+    resumeAfterQualityChange.current = Boolean(video && !video.paused);
+
+    setVideoError("");
+    setSelectedVideoUrl(nextUrl);
+  };
+
+  // Restore playback after the selected quality loads.
+  const handleLoadedMetadata = () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    setDuration(Number.isFinite(video.duration) ? video.duration : 0);
+    setVolume(video.volume);
+    setMuted(video.muted);
+
+    if (pendingPosition.current !== null) {
+      const position = pendingPosition.current;
+      pendingPosition.current = null;
+
+      if (Number.isFinite(video.duration)) {
+        video.currentTime = Math.min(position, video.duration);
+      }
+
+      if (resumeAfterQualityChange.current) {
+        resumeAfterQualityChange.current = false;
+        video.play().catch(console.error);
+      }
+    }
+  };
+
+  // Keyboard shortcuts.
+  useEffect(() => {
+    const handleKeyboard = (event) => {
+      const target = event.target;
+
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable ||
+          ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(
+            target.tagName
+          ))
+      ) {
+        return;
+      }
+
+      if (!videoRef.current) return;
+
+      if (event.code === "Space") {
+        event.preventDefault();
+        togglePlay();
+      } else if (event.key === "ArrowLeft") {
+        skip(-10);
+      } else if (event.key === "ArrowRight") {
+        skip(10);
+      } else if (event.key.toLowerCase() === "m") {
+        toggleMute();
       }
     };
 
-    fetchMovie();
-  }, [id]);
+    window.addEventListener("keydown", handleKeyboard);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyboard);
+    };
+  }, [togglePlay, skip, toggleMute]);
 
   if (loading) {
     return (
-      <div className="movie-details-page">
-        <Navbar />
-
-        <div className="details-loading">
-          <div className="loader"></div>
-          <p>Loading movie...</p>
-        </div>
+      <div className="movie-details-page movie-loading-page">
+        <div className="movie-loader" />
+        <p>Loading movie...</p>
       </div>
     );
   }
 
-  if (error) {
+  if (error || !movie) {
     return (
-      <div className="movie-details-page">
-        <Navbar />
+      <div className="movie-details-page movie-error-page">
+        <div className="movie-error-box">
+          <div className="movie-error-icon">!</div>
+          <h2>Movie Not Available</h2>
+          <p>{error || "Movie not found."}</p>
 
-        <div className="details-error">
-          ❌ {error}
-          <button onClick={() => navigate("/movies")}>← Back to Movies</button>
+          <button
+            type="button"
+            className="movie-back-page-button"
+            onClick={() => navigate("/movies")}
+          >
+            ← Back to Movies
+          </button>
         </div>
       </div>
     );
   }
-
-  if (!movie) {
-    return null;
-  }
-
-  const releaseYear = movie.release_date
-    ? new Date(movie.release_date).getFullYear()
-    : "N/A";
 
   return (
     <div className="movie-details-page">
-      <Navbar />
-
-      <main className="movie-details-container">
-        {/* BACK BUTTON */}
-
-        <button className="details-back" onClick={() => navigate("/movies")}>
-          ← Back to Movies
+      <header className="movie-top-bar">
+        <button
+          type="button"
+          className="movie-page-back"
+          onClick={() => navigate("/movies")}
+        >
+          ← Movies
         </button>
 
-        {/* MOVIE DETAILS */}
+        <h1>{movie.title}</h1>
+      </header>
 
-        <section className="movie-details">
-          {/* POSTER */}
+      <main>
+        <section
+          ref={playerRef}
+          className="custom-player"
+          aria-label="Movie video player"
+        >
+          {isFullscreen && (
+            <button
+              type="button"
+              className="movie-back-button"
+              onClick={() => navigate("/movies")}
+            >
+              ← Back to Movies
+            </button>
+          )}
 
-          <div className="details-poster">
-            {movie.logo ? (
-              <img src={movie.logo} alt={movie.title} />
-            ) : (
-              <div className="details-no-poster">🎬</div>
+          {selectedVideoUrl ? (
+            <video
+              key={selectedVideoUrl}
+              ref={videoRef}
+              className="movie-video"
+              src={selectedVideoUrl}
+              controls
+              controlsList="nodownload"
+              playsInline
+              preload="metadata"
+              onLoadedMetadata={handleLoadedMetadata}
+              onTimeUpdate={(event) =>
+                setCurrentTime(event.currentTarget.currentTime)
+              }
+              onDurationChange={(event) => {
+                const value = event.currentTarget.duration;
+                setDuration(Number.isFinite(value) ? value : 0);
+              }}
+              onPlay={() => setPlaying(true)}
+              onPause={() => setPlaying(false)}
+              onVolumeChange={(event) => {
+                setMuted(event.currentTarget.muted);
+                setVolume(event.currentTarget.volume);
+              }}
+              onError={() => {
+                setVideoError(
+                  "The video could not be played. Check the uploaded file and media URL.",
+                );
+              }}
+            >
+              Your browser does not support video playback.
+            </video>
+          ) : (
+            <div className="no-video">
+              <span>🎬</span>
+              <p>No video is available for this movie.</p>
+            </div>
+          )}
+
+          {videoError && (
+            <p className="movie-video-error" role="alert">
+              {videoError}
+            </p>
+          )}
+
+          {videos.length > 1 && (
+            <div className="movie-quality-selector">
+              <label htmlFor="movie-quality">Video quality</label>
+
+              <select
+                id="movie-quality"
+                value={selectedVideoUrl}
+                onChange={changeQuality}
+              >
+                {videos.map((item) => (
+                  <option key={item.id} value={item.url}>
+                    {item.quality}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="movie-player-actions">
+            {selectedVideoUrl && (
+              <>
+                <button type="button" onClick={togglePlay}>
+                  {playing ? "❚❚ Pause" : "▶ Play"}
+                </button>
+
+                <button type="button" onClick={() => skip(-10)}>
+                  ↶ 10 sec
+                </button>
+
+                <button type="button" onClick={() => skip(10)}>
+                  10 sec ↷
+                </button>
+
+                <button type="button" onClick={toggleMute}>
+                  {muted ? "🔇 Unmute" : "🔊 Mute"}
+                </button>
+
+                <label>
+                  Volume
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={muted ? 0 : volume}
+                    onChange={handleVolumeChange}
+                  />
+                </label>
+
+                <span className="movie-time">
+                  {formatTime(currentTime)} / {formatTime(duration)}
+                </span>
+
+                <button type="button" onClick={toggleFullscreen}>
+                  ⛶ Fullscreen
+                </button>
+              </>
             )}
           </div>
+        </section>
 
-          {/* INFORMATION */}
-
-          <div className="details-content">
-            <p className="details-label">CINEHUB MOVIE</p>
-
-            <h1>{movie.title}</h1>
-
-            <div className="details-meta">
-              <span>📅 {releaseYear}</span>
-
-              <span>⭐ {movie.rating}/10</span>
-
-              <span>🌐 {movie.language}</span>
-
-              <span>🎞️ {movie.quality}</span>
+        {/* Movie information only. No Download Movie button or section. */}
+        <section className="movie-information">
+          <div className="movie-info-main">
+            <div className="movie-logo-container">
+              {movie.logo ? (
+                <img
+                  src={getMediaUrl(movie.logo)}
+                  alt={`${movie.title} poster`}
+                  className="movie-logo"
+                />
+              ) : (
+                <div className="movie-logo-placeholder">🎬</div>
+              )}
             </div>
 
-            {/* GENRES */}
+            <div className="movie-info-content">
+              <span className="movie-info-label">CINEHUB MOVIE</span>
 
-            <div className="details-genres">
-              {movie.genres?.split(",").map((genre, index) => (
-                <span key={index}>{genre.trim()}</span>
-              ))}
-            </div>
+              <h2>{movie.title}</h2>
 
-            {/* DESCRIPTION */}
+              <div className="movie-meta-info">
+                {movie.release_date && <span>📅 {movie.release_date}</span>}
 
-            <p className="details-description">
-              Watch <strong>{movie.title}</strong> on CineHub and enjoy this
-              movie in high quality.
-            </p>
+                {movie.language && <span>🌐 {movie.language}</span>}
 
-            {/* INFORMATION */}
+                {movie.rating !== null && movie.rating !== undefined && (
+                  <span>⭐ {movie.rating}/10</span>
+                )}
 
-            <div className="movie-information">
-              <div>
-                <span>Director</span>
-                <strong>{movie.director}</strong>
+                {movie.quality && (
+                  <span>
+                    🎞️ {movie.quality === "FULL_HD" ? "Full HD" : movie.quality}
+                  </span>
+                )}
               </div>
 
-              <div>
-                <span>Starring</span>
-                <strong>{movie.starring}</strong>
-              </div>
+              {movie.genres && (
+                <p className="movie-genres-info">{movie.genres}</p>
+              )}
 
-              <div>
-                <span>Release Date</span>
-                <strong>{movie.release_date}</strong>
-              </div>
+              {movie.director && (
+                <p>
+                  <strong>Director:</strong> {movie.director}
+                </p>
+              )}
 
-              <div>
-                <span>Language</span>
-                <strong>{movie.language}</strong>
-              </div>
-            </div>
-
-            {/* WATCH */}
-
-            <div className="details-actions">
-              <button
-                className="watch-movie-button"
-                onClick={() => {
-                  if (movie.movie_file) {
-                    window.open(movie.movie_file, "_blank");
-                  }
-                }}
-              >
-                ▶ Watch Movie
-              </button>
+              {movie.starring && (
+                <p>
+                  <strong>Starring:</strong> {movie.starring}
+                </p>
+              )}
             </div>
           </div>
         </section>

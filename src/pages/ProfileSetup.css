@@ -1,0 +1,168 @@
+.profile-setup-page {
+  min-height: 100vh;
+
+  display: flex;
+  justify-content: center;
+  align-items: center;
+
+  padding: 25px;
+
+  background:
+    radial-gradient(
+      circle at 50% 0%,
+      rgba(229, 9, 20, 0.15),
+      transparent 40%
+    ),
+    #050505;
+}
+
+.profile-setup-card {
+  width: 100%;
+  max-width: 550px;
+
+  padding: 40px;
+
+  background: #101010;
+
+  border: 1px solid #252525;
+
+  border-radius: 22px;
+
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.65);
+}
+
+.profile-setup-card h1 {
+  font-family: "Montserrat", sans-serif;
+
+  font-size: 30px;
+
+  margin-bottom: 8px;
+}
+
+.profile-setup-card > p {
+  color: #777;
+
+  font-size: 14px;
+
+  margin-bottom: 30px;
+}
+
+.setup-group {
+  margin-bottom: 20px;
+}
+
+.setup-group label {
+  display: block;
+
+  margin-bottom: 8px;
+
+  color: #aaa;
+
+  font-size: 13px;
+
+  font-weight: 600;
+}
+
+.setup-input,
+.setup-select {
+  width: 100%;
+
+  padding: 14px 15px;
+
+  background: #171717;
+
+  border: 1px solid #2b2b2b;
+
+  border-radius: 11px;
+
+  color: white;
+
+  outline: none;
+}
+
+.setup-input:focus,
+.setup-select:focus {
+  border-color: #e50914;
+
+  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.08);
+}
+
+.role-options {
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  gap: 12px;
+}
+
+.role-option {
+  padding: 18px;
+
+  background: #151515;
+
+  border: 1px solid #292929;
+
+  border-radius: 12px;
+
+  cursor: pointer;
+
+  transition: 0.3s;
+}
+
+.role-option:hover {
+  border-color: #555;
+}
+
+.role-option.active {
+  border-color: #e50914;
+
+  background: rgba(229, 9, 20, 0.08);
+}
+
+.role-option h3 {
+  font-size: 15px;
+
+  margin-bottom: 5px;
+}
+
+.role-option p {
+  color: #666;
+
+  font-size: 11px;
+}
+
+.setup-button {
+  width: 100%;
+
+  padding: 15px;
+
+  border: none;
+
+  border-radius: 11px;
+
+  background: #e50914;
+
+  color: white;
+
+  font-weight: 700;
+
+  margin-top: 10px;
+
+  transition: 0.3s;
+}
+
+.setup-button:hover {
+  background: #f6121d;
+
+  transform: translateY(-2px);
+}
+
+@media (max-width: 550px) {
+  .profile-setup-card {
+    padding: 25px 20px;
+  }
+
+  .role-options {
+    grid-template-columns: 1fr;
+  }
+}

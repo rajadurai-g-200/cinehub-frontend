@@ -1,0 +1,93 @@
+.cine-navbar {
+  position: sticky;
+
+  top: 0;
+
+  z-index: 1000;
+
+  height: 72px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  padding: 0 5%;
+
+  background: rgba(5, 5, 5, 0.88);
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+
+  backdrop-filter: blur(20px);
+}
+
+.cine-logo {
+  font-family: "Montserrat", sans-serif;
+
+  font-size: 25px;
+
+  font-weight: 800;
+}
+
+.cine-logo span {
+  color: #e50914;
+}
+
+.nav-links {
+  display: flex;
+
+  align-items: center;
+
+  gap: 25px;
+}
+
+.nav-links a {
+  color: #aaa;
+
+  font-size: 14px;
+
+  font-weight: 600;
+
+  transition: 0.2s;
+}
+
+.nav-links a:hover,
+.nav-links a.active {
+  color: white;
+}
+
+.nav-profile {
+  width: 40px;
+  height: 40px;
+
+  display: flex;
+
+  justify-content: center;
+
+  align-items: center;
+
+  border-radius: 50%;
+
+  background: linear-gradient(
+    135deg,
+    #e50914,
+    #78040a
+  );
+
+  font-weight: 800;
+}
+
+@media (max-width: 700px) {
+  .cine-navbar {
+    padding: 0 18px;
+  }
+
+  .nav-links {
+    gap: 12px;
+  }
+
+  .nav-links a {
+    font-size: 12px;
+  }
+}

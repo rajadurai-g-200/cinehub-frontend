@@ -1,308 +1,323 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
+import "./CreatorDashboard.css";
+
+const initialForm = {
+  title: "",
+  release_date: "",
+  director: "",
+  starring: "",
+  genres: "",
+  language: "TAMIL",
+  quality: "FULL_HD",
+};
 
 function CreatorDashboard() {
   const navigate = useNavigate();
 
-  // =====================================================
-  // FORM DATA
-  // =====================================================
-
-  const [form, setForm] = useState({
-    title: "",
-    release_date: "",
-    director: "",
-    starring: "",
-    genres: "",
-    language: "TAMIL",
-    quality: "HD",
-    rating: "",
-  });
-
-  // =====================================================
-  // FILE STATES
-  // =====================================================
+  const [user, setUser] = useState({});
+  const [movies, setMovies] = useState([]);
+  const [form, setForm] = useState(initialForm);
 
   const [logo, setLogo] = useState(null);
   const [movieFile, setMovieFile] = useState(null);
 
-  // =====================================================
-  // UI STATES
-  // =====================================================
-
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState("overview");
 
-  // =====================================================
-  // HANDLE TEXT INPUT
-  // =====================================================
+  const [watchMovie, setWatchMovie] = useState(null);
+  const [selectedQuality, setSelectedQuality] = useState("");
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
+  useEffect(() => {
+    const savedUser = localStorage.getItem("user");
 
-    setForm((previousForm) => ({
-      ...previousForm,
-      [name]: value,
-    }));
-
-    setError("");
-    setMessage("");
-  };
-
-  // =====================================================
-  // HANDLE LOGO
-  // =====================================================
-
-  const handleLogoChange = (e) => {
-    const file = e.target.files[0];
-
-    if (!file) {
-      setLogo(null);
-      return;
+    if (savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch {
+        setUser({});
+      }
     }
 
-    console.log("Selected logo:", file);
+    loadMovies();
+  }, []);
 
-    // Check image type
-    if (!file.type.startsWith("image/")) {
-      setError("Please select a valid image file.");
-      e.target.value = "";
-      setLogo(null);
-      return;
-    }
+  // --------------------------------------------------
+  // LOAD CREATOR MOVIES
+  // --------------------------------------------------
 
-    // 5 MB limit
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Movie logo must be less than 5 MB.");
-      e.target.value = "";
-      setLogo(null);
-      return;
-    }
-
-    setLogo(file);
-    setError("");
-    setMessage("");
-  };
-
-  // =====================================================
-  // HANDLE MOVIE FILE
-  // =====================================================
-
-  const handleMovieFileChange = (e) => {
-    const file = e.target.files[0];
-
-    if (!file) {
-      setMovieFile(null);
-      return;
-    }
-
-    console.log("Selected movie:", file);
-
-    // Check video type
-    if (!file.type.startsWith("video/")) {
-      setError("Please select a valid video file.");
-      e.target.value = "";
-      setMovieFile(null);
-      return;
-    }
-
-    setMovieFile(file);
-    setError("");
-    setMessage("");
-  };
-
-  // =====================================================
-  // SUBMIT MOVIE
-  // =====================================================
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
+  const loadMovies = async () => {
     setLoading(true);
-    setMessage("");
-    setError("");
-
-    // ===================================================
-    // VALIDATION
-    // ===================================================
-
-    if (!form.title.trim()) {
-      setError("Please enter the movie name.");
-      setLoading(false);
-      return;
-    }
-
-    if (!form.release_date) {
-      setError("Please select the release date.");
-      setLoading(false);
-      return;
-    }
-
-    if (!form.director.trim()) {
-      setError("Please enter the director name.");
-      setLoading(false);
-      return;
-    }
-
-    if (!form.starring.trim()) {
-      setError("Please enter the starring actors.");
-      setLoading(false);
-      return;
-    }
-
-    if (!form.genres.trim()) {
-      setError("Please enter the movie genres.");
-      setLoading(false);
-      return;
-    }
-
-    if (!logo) {
-      setError("Please select a movie logo.");
-      setLoading(false);
-      return;
-    }
-
-    if (!movieFile) {
-      setError("Please select a movie file.");
-      setLoading(false);
-      return;
-    }
-
-    // ===================================================
-    // CREATE FORMDATA
-    // ===================================================
-
-    const formData = new FormData();
-
-    formData.append("title", form.title.trim());
-
-    formData.append("release_date", form.release_date);
-
-    formData.append("director", form.director.trim());
-
-    formData.append("starring", form.starring.trim());
-
-    formData.append("genres", form.genres.trim());
-
-    formData.append("language", form.language);
-
-    formData.append("quality", form.quality);
-
-    formData.append("rating", form.rating || "0");
-
-    // IMPORTANT:
-    // These must match Django request.FILES.get()
-    formData.append("logo", logo);
-    formData.append("movie_file", movieFile);
-
-    // ===================================================
-    // DEBUG
-    // ===================================================
-
-    console.log("========== MOVIE UPLOAD ==========");
-
-    for (const [key, value] of formData.entries()) {
-      console.log(
-        key,
-        value instanceof File ? `${value.name} (${value.type})` : value,
-      );
-    }
-
-    console.log("==================================");
-
-    // ===================================================
-    // API REQUEST
-    // ===================================================
 
     try {
-      const response = await API.post("/movies/create/", formData);
+      const response = await API.get("/movies/my/");
+      const data = response.data;
 
-      console.log("Upload response:", response.data);
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.movies)
+          ? data.movies
+          : Array.isArray(data?.results)
+            ? data.results
+            : [];
 
-      // =================================================
-      // SUCCESS
-      // =================================================
-
-      setMessage(
-        response.data.message ||
-          "Movie submitted successfully for admin approval.",
+      setMovies(list);
+      setError("");
+    } catch (err) {
+      console.error(
+        "Loading creator movies failed:",
+        err.response?.data || err.message
       );
 
-      // Reset form
-      setForm({
-        title: "",
-        release_date: "",
-        director: "",
-        starring: "",
-        genres: "",
-        language: "TAMIL",
-        quality: "HD",
-        rating: "",
-      });
-
-      setLogo(null);
-      setMovieFile(null);
-
-      // Clear file inputs
-      const logoInput = document.getElementById("logo");
-
-      const movieInput = document.getElementById("movie_file");
-
-      if (logoInput) {
-        logoInput.value = "";
-      }
-
-      if (movieInput) {
-        movieInput.value = "";
-      }
-    } catch (err) {
-      console.error("Movie upload error:", err.response?.data || err);
-
-      // =================================================
-      // ERROR HANDLING
-      // =================================================
-
-      if (err.response?.status === 401) {
-        setError("Your login session has expired. Please login again.");
-
-        // Optional: clear expired authentication
-        localStorage.removeItem("accessToken");
-        localStorage.removeItem("refreshToken");
-        localStorage.removeItem("user");
-      } else if (err.response?.status === 403) {
-        setError(
-          err.response?.data?.message || "Only creators can upload movies.",
-        );
-      } else if (err.response?.status === 400) {
-        setError(
+      setError(
+        err.response?.data?.detail ||
           err.response?.data?.message ||
-            "Please check the movie details and files.",
-        );
-      } else if (err.response?.status >= 500) {
-        setError("Server error. Please try again later.");
-      } else {
-        setError(err.response?.data?.message || "Movie upload failed.");
-      }
+          "Could not load your movies. Check the /movies/my/ endpoint."
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // =====================================================
-  // BACK HOME
-  // =====================================================
+  // --------------------------------------------------
+  // FORM HANDLING
+  // --------------------------------------------------
 
-  const handleBackHome = () => {
-    navigate("/");
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+
+    setForm((previous) => ({
+      ...previous,
+      [name]: value,
+    }));
   };
 
-  // =====================================================
-  // LOGOUT
-  // =====================================================
+  const getServerError = (err) => {
+    const data = err.response?.data;
 
-  const handleLogout = () => {
+    if (typeof data === "string") {
+      return data;
+    }
+
+    if (data?.detail) {
+      return data.detail;
+    }
+
+    if (data?.message) {
+      return data.message;
+    }
+
+    if (data && typeof data === "object") {
+      return Object.entries(data)
+        .map(([field, messages]) => {
+          const text = Array.isArray(messages)
+            ? messages.join(", ")
+            : String(messages);
+
+          return `${field}: ${text}`;
+        })
+        .join(" | ");
+    }
+
+    return err.message || "An unexpected error occurred.";
+  };
+
+  // --------------------------------------------------
+  // UPLOAD MOVIE
+  // --------------------------------------------------
+
+  const handleUpload = async (event) => {
+    event.preventDefault();
+
+    setError("");
+    setSuccess("");
+
+    if (
+      !form.title.trim() ||
+      !form.release_date ||
+      !form.director.trim() ||
+      !form.starring.trim() ||
+      !form.genres.trim()
+    ) {
+      setError("Please complete all movie information fields.");
+      return;
+    }
+
+    if (!logo || !movieFile) {
+      setError("Please select both a movie poster and a video file.");
+      return;
+    }
+
+    if (!logo.type.startsWith("image/")) {
+      setError("Please select a valid image for the movie poster.");
+      return;
+    }
+
+    if (!movieFile.type.startsWith("video/")) {
+      setError("Please select a valid video file.");
+      return;
+    }
+
+    const formData = new FormData();
+
+    Object.entries(form).forEach(([key, value]) => {
+      formData.append(key, value);
+    });
+
+    formData.append("logo", logo);
+    formData.append("movie_file", movieFile);
+
+    setUploading(true);
+
+    try {
+      // IMPORTANT:
+      // backend/movies/urls.py defines the creator endpoint as create/
+      // API baseURL should be http://127.0.0.1:8000/api
+      await API.post("/movies/create/", formData);
+
+      setSuccess(
+        "Movie submitted successfully for admin review."
+      );
+
+      setForm({ ...initialForm });
+      setLogo(null);
+      setMovieFile(null);
+
+      if (event.currentTarget) {
+        event.currentTarget.reset();
+      }
+
+      await loadMovies();
+      setActiveTab("my-movies");
+    } catch (err) {
+      console.error(
+        "Movie upload failed:",
+        err.response?.data || err.message
+      );
+
+      setError(
+        `Movie upload failed: ${getServerError(err)}`
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // --------------------------------------------------
+  // MOVIE STATUS
+  // --------------------------------------------------
+
+  const getStatus = (movie) => {
+    const status = (movie.status || "").toUpperCase();
+
+    if (status === "APPROVED" || movie.is_approved === true) {
+      return "Approved";
+    }
+
+    if (status === "REJECTED" || status === "DECLINED") {
+      return "Rejected";
+    }
+
+    return "Pending";
+  };
+
+  const approvedCount = movies.filter(
+    (movie) => getStatus(movie) === "Approved"
+  ).length;
+
+  const pendingCount = movies.filter(
+    (movie) => getStatus(movie) === "Pending"
+  ).length;
+
+  const filteredMovies = movies.filter((movie) =>
+    (movie.title || "")
+      .toLowerCase()
+      .includes(search.toLowerCase())
+  );
+
+  const displayName =
+    user.username ||
+    user.name ||
+    user.email?.split("@")[0] ||
+    "Creator";
+
+  const initials = displayName.slice(0, 2).toUpperCase();
+
+  // --------------------------------------------------
+  // VIDEO URL HANDLING
+  // --------------------------------------------------
+
+  const getAvailableVideos = (movie) => {
+    const videos = [];
+
+    const addVideo = (quality, file) => {
+      if (typeof file !== "string" || !file.trim()) {
+        return;
+      }
+
+      // Absolute URLs can be used directly.
+      // Relative media paths are resolved against the Django server.
+      let url = file;
+
+      if (file.startsWith("/")) {
+        url = `http://127.0.0.1:8000${file}`;
+      } else if (!/^https?:\/\//i.test(file)) {
+        url = `http://127.0.0.1:8000/${file}`;
+      }
+
+      if (!videos.some((video) => video.file === url)) {
+        videos.push({
+          quality: quality || "Original",
+          file: url,
+        });
+      }
+    };
+
+    addVideo(movie.quality || "Original", movie.movie_file);
+
+    if (Array.isArray(movie.quality_files)) {
+      movie.quality_files.forEach((item) => {
+        addVideo(item.quality, item.file);
+      });
+    }
+
+    return videos;
+  };
+
+  const openMovie = (movie) => {
+    const videos = getAvailableVideos(movie);
+
+    if (videos.length === 0) {
+      setError(
+        `No video URL was returned for "${movie.title}". Check the /movies/my/ API response.`
+      );
+      return;
+    }
+
+    setError("");
+    setWatchMovie(movie);
+    setSelectedQuality(videos[0].quality);
+  };
+
+  const selectedVideos = watchMovie
+    ? getAvailableVideos(watchMovie)
+    : [];
+
+  const selectedVideo =
+    selectedVideos.find(
+      (video) => video.quality === selectedQuality
+    ) || selectedVideos[0] || null;
+
+  // --------------------------------------------------
+  // LOGOUT
+  // --------------------------------------------------
+
+  const logout = () => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
@@ -311,232 +326,746 @@ function CreatorDashboard() {
     navigate("/login");
   };
 
-  // =====================================================
+  // --------------------------------------------------
+  // REUSABLE MOVIE ACTION
+  // --------------------------------------------------
+
+  const WatchButton = ({ movie }) => (
+    <button
+      className="creator-primary-button"
+      onClick={() => openMovie(movie)}
+      type="button"
+    >
+      ▶ Watch Movie
+    </button>
+  );
+
+  // --------------------------------------------------
   // UI
-  // =====================================================
+  // --------------------------------------------------
 
   return (
-    <div className="creator-page">
-      <div className="creator-card">
-        {/* HEADER */}
-        <div className="creator-header">
-          <div>
-            <h1>🎬 Creator Dashboard</h1>
+    <div className="creator-dashboard">
+      <aside className="creator-sidebar">
+        <button
+          className="creator-brand"
+          onClick={() => navigate("/")}
+          type="button"
+        >
+          <span className="creator-brand-icon">C</span>
+          <span>
+            Cine<span className="brand-red">Hub</span>
+          </span>
+        </button>
 
-            <p className="subtitle">Upload your movie for admin approval</p>
+        <div className="sidebar-label">WORKSPACE</div>
+
+        {[
+          ["overview", "▦", "Overview"],
+          ["upload", "＋", "Upload Movie"],
+          ["my-movies", "▤", "My Movies"],
+        ].map(([tab, icon, label]) => (
+          <button
+            key={tab}
+            className={`creator-nav ${
+              activeTab === tab ? "active" : ""
+            }`}
+            onClick={() => setActiveTab(tab)}
+            type="button"
+          >
+            <span>{icon}</span>
+            {label}
+
+            {tab === "my-movies" && (
+              <span className="nav-count">{movies.length}</span>
+            )}
+          </button>
+        ))}
+
+        <div className="sidebar-label sidebar-bottom-label">
+          ACCOUNT
+        </div>
+
+        <button
+          className="creator-nav"
+          onClick={() => navigate("/profile")}
+          type="button"
+        >
+          <span>◎</span> My Profile
+        </button>
+
+        <button
+          className="creator-nav"
+          onClick={() => navigate("/")}
+          type="button"
+        >
+          <span>⌂</span> View CineHub
+        </button>
+
+        <div className="creator-sidebar-footer">
+          <div className="creator-avatar">{initials}</div>
+
+          <div className="creator-user-details">
+            <strong>{displayName}</strong>
+            <span>Movie Creator</span>
           </div>
 
           <button
+            className="creator-logout"
+            onClick={logout}
+            title="Logout"
             type="button"
-            className="logout-button"
-            onClick={handleLogout}
           >
-            Logout
+            ↗
           </button>
         </div>
+      </aside>
 
-        {/* SUCCESS MESSAGE */}
+      <main className="creator-main">
+        <header className="creator-topbar">
+          <div>
+            <div className="creator-breadcrumb">
+              CineHub / Creator Studio
+            </div>
 
-        {message && <div className="success-message">✅ {message}</div>}
-
-        {/* ERROR MESSAGE */}
-
-        {error && <div className="error-message">❌ {error}</div>}
-
-        {/* FORM */}
-
-        <form onSubmit={handleSubmit} encType="multipart/form-data">
-          {/* =========================================
-              MOVIE LOGO
-          ========================================= */}
-
-          <div className="form-group">
-            <label htmlFor="logo">Movie Logo</label>
-
-            <input
-              id="logo"
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              onChange={handleLogoChange}
-            />
-
-            {logo && <p className="file-selected">✅ {logo.name}</p>}
+            <h1>
+              {activeTab === "upload"
+                ? "Upload a Movie"
+                : activeTab === "my-movies"
+                  ? "My Movies"
+                  : "Creator Studio"}
+            </h1>
           </div>
 
-          {/* =========================================
-              MOVIE FILE
-          ========================================= */}
+          <div className="creator-top-actions">
+            <span className="creator-live-dot" />
+            <span className="creator-online-text">
+              Creator Workspace
+            </span>
 
-          <div className="form-group">
-            <label htmlFor="movie_file">Movie File</label>
-
-            <input
-              id="movie_file"
-              type="file"
-              accept="video/*"
-              onChange={handleMovieFileChange}
-            />
-
-            {movieFile && <p className="file-selected">✅ {movieFile.name}</p>}
-          </div>
-
-          {/* =========================================
-              MOVIE NAME
-          ========================================= */}
-
-          <div className="form-group">
-            <label htmlFor="title">Movie Name</label>
-
-            <input
-              id="title"
-              type="text"
-              name="title"
-              placeholder="Enter movie name"
-              value={form.title}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* =========================================
-              RELEASE DATE
-          ========================================= */}
-
-          <div className="form-group">
-            <label htmlFor="release_date">Release Date</label>
-
-            <input
-              id="release_date"
-              type="date"
-              name="release_date"
-              value={form.release_date}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* =========================================
-              DIRECTOR
-          ========================================= */}
-
-          <div className="form-group">
-            <label htmlFor="director">Director</label>
-
-            <input
-              id="director"
-              type="text"
-              name="director"
-              placeholder="Enter director name"
-              value={form.director}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* =========================================
-              STARRING
-          ========================================= */}
-
-          <div className="form-group">
-            <label htmlFor="starring">Starring</label>
-
-            <input
-              id="starring"
-              type="text"
-              name="starring"
-              placeholder="Actor, Sub Actor"
-              value={form.starring}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* =========================================
-              GENRES
-          ========================================= */}
-
-          <div className="form-group">
-            <label htmlFor="genres">Genres</label>
-
-            <input
-              id="genres"
-              type="text"
-              name="genres"
-              placeholder="Action, Thriller"
-              value={form.genres}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* =========================================
-              LANGUAGE
-          ========================================= */}
-
-          <div className="form-group">
-            <label htmlFor="language">Language</label>
-
-            <select
-              id="language"
-              name="language"
-              value={form.language}
-              onChange={handleChange}
+            <button
+              className="creator-profile-button"
+              onClick={() => navigate("/profile")}
+              type="button"
             >
-              <option value="TAMIL">Tamil</option>
-
-              <option value="ENGLISH">English</option>
-            </select>
+              {initials}
+            </button>
           </div>
+        </header>
 
-          {/* =========================================
-              QUALITY
-          ========================================= */}
+        {error && (
+          <div
+            className="creator-alert creator-alert-error"
+            role="alert"
+          >
+            <span>!</span>
+            <p>{error}</p>
 
-          <div className="form-group">
-            <label htmlFor="quality">Quality</label>
-
-            <select
-              id="quality"
-              name="quality"
-              value={form.quality}
-              onChange={handleChange}
+            <button
+              onClick={() => setError("")}
+              type="button"
             >
-              <option value="HD">HD</option>
-
-              <option value="FULL_HD">Full HD</option>
-            </select>
+              ×
+            </button>
           </div>
+        )}
 
-          {/* =========================================
-              RATING
-          ========================================= */}
+        {success && (
+          <div
+            className="creator-alert creator-alert-success"
+            role="status"
+          >
+            <span>✓</span>
+            <p>{success}</p>
 
-          <div className="form-group">
-            <label htmlFor="rating">Movie Rating</label>
-
-            <input
-              id="rating"
-              type="number"
-              name="rating"
-              min="0"
-              max="10"
-              step="0.1"
-              placeholder="8.5"
-              value={form.rating}
-              onChange={handleChange}
-            />
+            <button
+              onClick={() => setSuccess("")}
+              type="button"
+            >
+              ×
+            </button>
           </div>
+        )}
 
-          {/* =========================================
-              SUBMIT
-          ========================================= */}
+        {/* OVERVIEW */}
 
-          <button type="submit" className="upload-button" disabled={loading}>
-            {loading ? "⏳ Uploading..." : "🚀 Submit Movie for Approval"}
-          </button>
-        </form>
+        {activeTab === "overview" && (
+          <>
+            <section className="creator-welcome">
+              <div className="welcome-decoration">C</div>
 
-        {/* BACK BUTTON */}
+              <div className="welcome-content">
+                <span className="welcome-eyebrow">
+                  YOUR CREATIVE SPACE
+                </span>
 
-        <button type="button" className="back-button" onClick={handleBackHome}>
-          ← Back to Home
-        </button>
-      </div>
+                <h2>
+                  Lights. Camera. <span>Creator!</span>
+                </h2>
+
+                <p>
+                  Upload your films, track reviews, and manage
+                  your CineHub submissions.
+                </p>
+
+                <button
+                  className="creator-primary-button"
+                  onClick={() => setActiveTab("upload")}
+                  type="button"
+                >
+                  ＋ Upload New Movie
+                </button>
+              </div>
+
+              <div className="welcome-film-icon">🎬</div>
+            </section>
+
+            <section className="creator-stats">
+              <div className="creator-stat-card">
+                <div className="stat-top">
+                  <span>Total Movies</span>
+                  <span className="stat-icon purple">▤</span>
+                </div>
+
+                <strong>{movies.length}</strong>
+                <small>Your submitted titles</small>
+              </div>
+
+              <div className="creator-stat-card">
+                <div className="stat-top">
+                  <span>Approved</span>
+                  <span className="stat-icon green">✓</span>
+                </div>
+
+                <strong>{approvedCount}</strong>
+                <small>Approved for publishing</small>
+              </div>
+
+              <div className="creator-stat-card">
+                <div className="stat-top">
+                  <span>Under Review</span>
+                  <span className="stat-icon orange">◷</span>
+                </div>
+
+                <strong>{pendingCount}</strong>
+                <small>Awaiting admin review</small>
+              </div>
+            </section>
+
+            <section className="creator-content-card">
+              <div className="creator-section-heading">
+                <div>
+                  <h2>Recent Movies</h2>
+                  <p>
+                    Track your latest submissions and preview your videos.
+                  </p>
+                </div>
+
+                <button
+                  className="creator-text-button"
+                  onClick={() => setActiveTab("my-movies")}
+                  type="button"
+                >
+                  View all →
+                </button>
+              </div>
+
+              {loading ? (
+                <div className="creator-empty">
+                  Loading your movies...
+                </div>
+              ) : movies.length === 0 ? (
+                <div className="creator-empty">
+                  <div className="empty-film">🎞</div>
+                  <h3>Your first movie starts here</h3>
+                  <p>
+                    Upload a movie to begin your CineHub journey.
+                  </p>
+
+                  <button
+                    className="creator-primary-button"
+                    onClick={() => setActiveTab("upload")}
+                    type="button"
+                  >
+                    Upload Your First Movie
+                  </button>
+                </div>
+              ) : (
+                <div className="creator-table-wrap">
+                  <table className="creator-table">
+                    <thead>
+                      <tr>
+                        <th>MOVIE</th>
+                        <th>LANGUAGE</th>
+                        <th>QUALITY</th>
+                        <th>STATUS</th>
+                        <th>ACTION</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {movies.slice(0, 5).map((movie) => (
+                        <tr key={movie.id}>
+                          <td>
+                            <div className="movie-title-cell">
+                              <img
+                                src={movie.logo || movie.thumbnail || ""}
+                                alt=""
+                                onError={(event) => {
+                                  event.currentTarget.style.display = "none";
+                                }}
+                              />
+
+                              <strong>
+                                {movie.title || "Untitled Movie"}
+                              </strong>
+                            </div>
+                          </td>
+
+                          <td>{movie.language || "—"}</td>
+                          <td>{movie.quality || "—"}</td>
+
+                          <td>
+                            <span
+                              className={`creator-status ${getStatus(
+                                movie
+                              ).toLowerCase()}`}
+                            >
+                              {getStatus(movie)}
+                            </span>
+                          </td>
+
+                          <td>
+                            <WatchButton movie={movie} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
+          </>
+        )}
+
+        {/* UPLOAD */}
+
+        {activeTab === "upload" && (
+          <section className="creator-content-card upload-content-card">
+            <div className="creator-section-heading">
+              <div>
+                <h2>Submit Your Movie</h2>
+                <p>
+                  Add your movie details and submit it for admin review.
+                </p>
+              </div>
+
+              <span className="submission-badge">
+                ADMIN REVIEW REQUIRED
+              </span>
+            </div>
+
+            <form
+              className="creator-upload-form"
+              onSubmit={handleUpload}
+            >
+              <div className="upload-section-label">
+                <span>01</span> Movie Information
+              </div>
+
+              <div className="creator-form-grid">
+                <div className="creator-field full-width">
+                  <label htmlFor="title">Movie Title *</label>
+
+                  <input
+                    id="title"
+                    name="title"
+                    value={form.title}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                <div className="creator-field">
+                  <label htmlFor="director">Director *</label>
+
+                  <input
+                    id="director"
+                    name="director"
+                    value={form.director}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                <div className="creator-field">
+                  <label htmlFor="starring">Starring *</label>
+
+                  <input
+                    id="starring"
+                    name="starring"
+                    value={form.starring}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                <div className="creator-field">
+                  <label htmlFor="release_date">
+                    Release Date *
+                  </label>
+
+                  <input
+                    id="release_date"
+                    name="release_date"
+                    type="date"
+                    value={form.release_date}
+                    onChange={handleChange}
+                    required
+                  />
+                </div>
+
+                <div className="creator-field">
+                  <label htmlFor="genres">Genres *</label>
+
+                  <input
+                    id="genres"
+                    name="genres"
+                    value={form.genres}
+                    onChange={handleChange}
+                    placeholder="Action, Thriller"
+                    required
+                  />
+                </div>
+
+                <div className="creator-field">
+                  <label htmlFor="language">Language</label>
+
+                  <select
+                    id="language"
+                    name="language"
+                    value={form.language}
+                    onChange={handleChange}
+                  >
+                    <option value="TAMIL">Tamil</option>
+                    <option value="ENGLISH">English</option>
+                  </select>
+                </div>
+
+                <div className="creator-field">
+                  <label htmlFor="quality">Default Quality</label>
+
+                  <select
+                    id="quality"
+                    name="quality"
+                    value={form.quality}
+                    onChange={handleChange}
+                  >
+                    <option value="FULL_HD">Full HD</option>
+                    <option value="HD">HD</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="upload-section-label">
+                <span>02</span> Movie Assets
+              </div>
+
+              <div className="creator-form-grid">
+                <div className="creator-field">
+                  <label htmlFor="logo">
+                    Movie Poster / Logo *
+                  </label>
+
+                  <label
+                    className="creator-file-drop"
+                    htmlFor="logo"
+                  >
+                    <span className="file-drop-icon">▧</span>
+
+                    <strong>
+                      {logo ? logo.name : "Choose poster image"}
+                    </strong>
+
+                    <small>PNG, JPG, WEBP</small>
+
+                    <input
+                      id="logo"
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) =>
+                        setLogo(event.target.files?.[0] || null)
+                      }
+                      required
+                    />
+                  </label>
+                </div>
+
+                <div className="creator-field">
+                  <label htmlFor="movie-file">
+                    Movie Video *
+                  </label>
+
+                  <label
+                    className="creator-file-drop"
+                    htmlFor="movie-file"
+                  >
+                    <span className="file-drop-icon">▷</span>
+
+                    <strong>
+                      {movieFile
+                        ? movieFile.name
+                        : "Choose movie video"}
+                    </strong>
+
+                    <small>
+                      MP4 with H.264 video is recommended
+                    </small>
+
+                    <input
+                      id="movie-file"
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime"
+                      onChange={(event) =>
+                        setMovieFile(event.target.files?.[0] || null)
+                      }
+                      required
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="creator-upload-note">
+                <span>ⓘ</span>
+
+                <p>
+                  Your movie needs admin approval before public
+                  publishing. You can preview your own submission
+                  in Creator Studio.
+                </p>
+              </div>
+
+              <div className="creator-form-actions">
+                <button
+                  type="button"
+                  className="creator-secondary-button"
+                  onClick={() => setActiveTab("overview")}
+                  disabled={uploading}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="creator-primary-button"
+                  disabled={uploading}
+                >
+                  {uploading
+                    ? "Submitting..."
+                    : "Submit for Approval →"}
+                </button>
+              </div>
+            </form>
+          </section>
+        )}
+
+        {/* MY MOVIES */}
+
+        {activeTab === "my-movies" && (
+          <section className="creator-content-card">
+            <div className="creator-section-heading creator-movies-heading">
+              <div>
+                <h2>My Movie Library</h2>
+                <p>
+                  Preview and monitor all your submissions.
+                </p>
+              </div>
+
+              <button
+                className="creator-primary-button"
+                onClick={() => setActiveTab("upload")}
+                type="button"
+              >
+                ＋ Add Movie
+              </button>
+            </div>
+
+            <div className="creator-search-row">
+              <input
+                type="search"
+                placeholder="Search your movies..."
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+
+              <button
+                className="creator-secondary-button"
+                onClick={loadMovies}
+                type="button"
+                disabled={loading}
+              >
+                ↻ Refresh
+              </button>
+            </div>
+
+            {loading ? (
+              <div className="creator-empty">
+                Loading your movies...
+              </div>
+            ) : filteredMovies.length === 0 ? (
+              <div className="creator-empty">
+                <div className="empty-film">🎬</div>
+                <h3>No matching movies</h3>
+                <p>Upload a movie or try another search.</p>
+              </div>
+            ) : (
+              <div className="creator-movie-grid">
+                {filteredMovies.map((movie) => (
+                  <article
+                    className="creator-movie-card"
+                    key={movie.id}
+                  >
+                    <div className="creator-movie-poster">
+                      {movie.logo || movie.thumbnail ? (
+                        <img
+                          src={movie.logo || movie.thumbnail}
+                          alt={movie.title || "Movie poster"}
+                        />
+                      ) : (
+                        <span>🎬</span>
+                      )}
+
+                      <span
+                        className={`creator-status ${getStatus(
+                          movie
+                        ).toLowerCase()}`}
+                      >
+                        {getStatus(movie)}
+                      </span>
+                    </div>
+
+                    <div className="creator-movie-info">
+                      <h3>
+                        {movie.title || "Untitled Movie"}
+                      </h3>
+
+                      <p>
+                        {movie.language || "Language not set"} ·{" "}
+                        {movie.quality || "Quality not set"}
+                      </p>
+
+                      <small>
+                        {movie.release_date ||
+                          "Release date not provided"}
+                      </small>
+
+                      <WatchButton movie={movie} />
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+      </main>
+
+      {/* VIDEO PLAYER MODAL */}
+
+      {watchMovie && (
+        <div
+          className="creator-player-overlay"
+          role="presentation"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) {
+              setWatchMovie(null);
+            }
+          }}
+        >
+          <section
+            className="creator-player-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Watch ${watchMovie.title || "movie"}`}
+          >
+            <div className="creator-player-header">
+              <div>
+                <h2>{watchMovie.title || "Watch Movie"}</h2>
+
+                <p>
+                  Creator preview · {getStatus(watchMovie)}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setWatchMovie(null)}
+                aria-label="Close player"
+              >
+                ✕
+              </button>
+            </div>
+
+            {selectedVideos.length > 1 && (
+              <div className="creator-quality-picker">
+                <label htmlFor="watch-quality">
+                  Video quality
+                </label>
+
+                <select
+                  id="watch-quality"
+                  value={selectedVideo?.quality || selectedQuality}
+                  onChange={(event) =>
+                    setSelectedQuality(event.target.value)
+                  }
+                >
+                  {selectedVideos.map((video) => (
+                    <option
+                      key={video.file}
+                      value={video.quality}
+                    >
+                      {video.quality}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {selectedVideo ? (
+              <>
+                <video
+                  key={selectedVideo.file}
+                  className="creator-video-player"
+                  controls
+                  autoPlay
+                  playsInline
+                  preload="metadata"
+                  onError={(event) => {
+                    console.error("Video playback failed:", {
+                      url: selectedVideo.file,
+                      mediaError: event.currentTarget.error,
+                    });
+
+                    setError(
+                      "Video playback failed. Check the video URL and the media request in the browser Network tab."
+                    );
+                  }}
+                >
+                  <source src={selectedVideo.file} />
+
+                  Your browser does not support HTML video.
+                </video>
+
+                <p className="creator-player-help">
+                  If the video does not play, check that the uploaded
+                  file exists and uses a browser-supported video codec.
+                </p>
+              </>
+            ) : (
+              <p>No video file was found for this movie.</p>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }

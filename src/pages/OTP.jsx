@@ -1,115 +1,114 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
+import "./OTP.css";
 
 function OTP() {
   const navigate = useNavigate();
 
-  // Get email from Login page
-  const email = localStorage.getItem("loginEmail");
+  // Get email saved by Login.jsx
+  const email = localStorage.getItem("loginEmail") || "";
 
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // =====================================================
   // VERIFY OTP
-  // =====================================================
-
   const handleVerifyOTP = async (e) => {
     e.preventDefault();
+    setError("");
 
-    // Check email
     if (!email) {
       setError("Email not found. Please go back and login again.");
       return;
     }
 
-    // Check OTP
-    if (!otp) {
-      setError("Please enter the OTP.");
-      return;
-    }
-
-    // OTP must be 6 digits
-    if (otp.length !== 6) {
-      setError("OTP must contain 6 digits.");
+    if (!/^\d{6}$/.test(otp)) {
+      setError("Please enter a valid 6-digit OTP.");
       return;
     }
 
     setLoading(true);
-    setError("");
 
     try {
-      // Send OTP to Django
       const response = await API.post("/auth/verify-otp/", {
-        email: email,
-        otp: otp,
+        email,
+        otp,
       });
 
       console.log("OTP verification response:", response.data);
 
-      // =================================================
-      // SAVE JWT TOKENS
-      // =================================================
+      const data = response.data;
 
-      if (!response.data.access) {
-        setError("Access token was not received from server.");
+      // Support either access/refresh or accessToken/refreshToken
+      const accessToken = data.access || data.accessToken;
+      const refreshToken = data.refresh || data.refreshToken;
+
+      if (!accessToken) {
+        setError("Access token was not received from the server.");
         return;
       }
 
-      localStorage.setItem("accessToken", response.data.access);
+      // Save JWT tokens
+      localStorage.setItem("accessToken", accessToken);
 
-      localStorage.setItem("refreshToken", response.data.refresh);
+      if (refreshToken) {
+        localStorage.setItem("refreshToken", refreshToken);
+      } else {
+        localStorage.removeItem("refreshToken");
+      }
 
-      // =================================================
-      // SAVE USER INFORMATION
-      // =================================================
+      // Save user information if returned
+      if (data.user) {
+        localStorage.setItem("user", JSON.stringify(data.user));
+      }
 
-      localStorage.setItem("user", JSON.stringify(response.data.user));
-
-      // =================================================
-      // OTP EMAIL NO LONGER NEEDED
-      // =================================================
-
+      // Remove temporary login email only after successful verification
       localStorage.removeItem("loginEmail");
 
-      // =================================================
-      // GO TO PROFILE SETUP
-      // =================================================
+      // Redirect based on server-provided role
+      const user = data.user || {};
 
-      navigate("/profile-setup");
+      if (
+        user.is_staff === true ||
+        user.is_superuser === true ||
+        user.role === "ADMIN"
+      ) {
+        navigate("/admin-dashboard");
+      } else {
+        navigate("/profile-setup");
+      }
     } catch (err) {
       console.error("OTP verification error:", err);
-
       console.error("Server response:", err.response?.data);
 
       if (err.response?.status === 400) {
-        setError(err.response?.data?.message || "Invalid or expired OTP.");
+        setError(
+          err.response?.data?.message ||
+            err.response?.data?.error ||
+            "Invalid or expired OTP."
+        );
       } else if (err.response?.status === 401) {
         setError("Authentication failed. Please request a new OTP.");
       } else if (err.response?.status >= 500) {
         setError("Server error. Please try again later.");
       } else {
-        setError(err.response?.data?.message || "Unable to verify OTP.");
+        setError(
+          err.response?.data?.message ||
+            err.response?.data?.error ||
+            "Unable to verify OTP. Please try again."
+        );
       }
 
-      // Clear OTP
       setOtp("");
     } finally {
       setLoading(false);
     }
   };
 
-  // =====================================================
   // CHANGE EMAIL
-  // =====================================================
-
   const handleChangeEmail = () => {
-    // Remove login email
     localStorage.removeItem("loginEmail");
-
-    // Remove old authentication data
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     localStorage.removeItem("user");
@@ -120,47 +119,36 @@ function OTP() {
     navigate("/login");
   };
 
-  // =====================================================
-  // OTP INPUT CHANGE
-  // =====================================================
-
+  // OTP INPUT
   const handleOTPChange = (e) => {
-    // Allow only numbers
     const value = e.target.value.replace(/\D/g, "");
 
-    // Maximum 6 digits
     if (value.length <= 6) {
       setOtp(value);
       setError("");
     }
   };
 
-  // =====================================================
-  // PAGE
-  // =====================================================
-
   return (
     <div className="otp-page">
       <div className="otp-card">
-        {/* ICON */}
         <div className="otp-icon">🔐</div>
 
-        {/* TITLE */}
         <h1>Verify OTP</h1>
 
-        {/* DESCRIPTION */}
-        <p className="otp-text">We sent a 6-digit OTP to</p>
+        <p className="otp-text">
+          We sent a 6-digit OTP to
+        </p>
 
-        {/* EMAIL */}
-        <strong className="user-email">{email || "your Gmail"}</strong>
+        <strong className="user-email">
+          {email || "your Gmail"}
+        </strong>
 
-        {/* FORM */}
         <form onSubmit={handleVerifyOTP}>
-          {/* LABEL */}
-          <label>Enter OTP</label>
+          <label htmlFor="otp">Enter OTP</label>
 
-          {/* OTP INPUT */}
           <input
+            id="otp"
             type="text"
             inputMode="numeric"
             pattern="[0-9]*"
@@ -170,18 +158,24 @@ function OTP() {
             autoFocus
             autoComplete="one-time-code"
             onChange={handleOTPChange}
+            disabled={loading || !email}
+            required
           />
 
-          {/* ERROR */}
-          {error && <div className="otp-error">❌ {error}</div>}
+          {error && (
+            <div className="otp-error">
+              ❌ {error}
+            </div>
+          )}
 
-          {/* VERIFY BUTTON */}
-          <button type="submit" disabled={loading || otp.length !== 6}>
+          <button
+            type="submit"
+            disabled={loading || !email || otp.length !== 6}
+          >
             {loading ? "Verifying..." : "Verify OTP"}
           </button>
         </form>
 
-        {/* CHANGE EMAIL */}
         <button
           type="button"
           className="change-email"
@@ -195,3 +189,4 @@ function OTP() {
 }
 
 export default OTP;
+

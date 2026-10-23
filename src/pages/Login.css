@@ -1,0 +1,230 @@
+/* ========================================
+   CINEHUB LOGIN PAGE
+======================================== */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 20px;
+
+  background:
+    radial-gradient(
+      circle at 20% 20%,
+      rgba(229, 9, 20, 0.20),
+      transparent 35%
+    ),
+    radial-gradient(
+      circle at 80% 80%,
+      rgba(150, 0, 0, 0.12),
+      transparent 35%
+    ),
+    #030303;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 470px;
+  padding: 42px;
+
+  background: rgba(15, 15, 15, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 24px;
+
+  box-shadow:
+    0 30px 100px rgba(0, 0, 0, 0.7),
+    0 0 50px rgba(229, 9, 20, 0.08);
+
+  backdrop-filter: blur(25px);
+
+  animation: loginAppear 0.6s ease;
+}
+
+@keyframes loginAppear {
+  from {
+    opacity: 0;
+    transform: translateY(25px) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.login-logo h1 {
+  font-family: "Montserrat", sans-serif;
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -1px;
+}
+
+.login-logo span {
+  color: #e50914;
+}
+
+.login-logo p {
+  margin-top: 8px;
+  color: #888;
+  font-size: 14px;
+}
+
+.login-title {
+  text-align: center;
+  font-size: 25px;
+  margin-bottom: 8px;
+}
+
+.login-subtitle {
+  text-align: center;
+  color: #777;
+  font-size: 14px;
+  margin-bottom: 28px;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.login-input-group {
+  position: relative;
+}
+
+.login-input-group label {
+  display: block;
+  margin-bottom: 8px;
+  color: #bbb;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.login-input {
+  width: 100%;
+  padding: 15px 16px;
+
+  background: #111;
+  border: 1px solid #292929;
+  border-radius: 12px;
+
+  color: white;
+  outline: none;
+
+  transition: 0.25s;
+}
+
+.login-input::placeholder {
+  color: #555;
+}
+
+.login-input:focus {
+  border-color: #e50914;
+  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.10);
+}
+
+.login-button {
+  width: 100%;
+  padding: 15px;
+  border: none;
+  border-radius: 12px;
+
+  background: linear-gradient(
+    135deg,
+    #e50914,
+    #b20710
+  );
+
+  color: white;
+  font-size: 15px;
+  font-weight: 700;
+
+  transition: 0.3s;
+}
+
+.login-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(229, 9, 20, 0.25);
+}
+
+.login-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  margin: 25px 0;
+
+  color: #666;
+  font-size: 12px;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: #292929;
+}
+
+.google-login {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.login-error {
+  background: rgba(229, 9, 20, 0.08);
+  border: 1px solid rgba(229, 9, 20, 0.25);
+
+  color: #ff6970;
+
+  padding: 12px 14px;
+  border-radius: 10px;
+
+  font-size: 13px;
+  margin-bottom: 15px;
+}
+
+.login-footer {
+  text-align: center;
+  color: #555;
+  font-size: 12px;
+  margin-top: 25px;
+}
+
+.login-security {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+
+  margin-top: 18px;
+
+  color: #777;
+  font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  .login-page {
+    padding: 15px;
+  }
+
+  .login-card {
+    padding: 28px 20px;
+    border-radius: 18px;
+  }
+
+  .login-logo h1 {
+    font-size: 32px;
+  }
+}

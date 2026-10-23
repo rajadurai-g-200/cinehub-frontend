@@ -1,95 +1,73 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
-import MovieDetails from "./pages/MovieDetails";
+import AdminMovieUpload from "./pages/AdminMovieUpload";
+import AdminUploadMovie from "./pages/AdminUploadMovie";
+import Profile from "./pages/Profile";
 import Login from "./pages/Login";
 import OTP from "./pages/OTP";
+import ProfileSetup from "./pages/ProfileSetup";
 import Home from "./pages/Home";
 import Movies from "./pages/Movies";
+import MovieDetails from "./pages/MovieDetails";
 import CreatorDashboard from "./pages/CreatorDashboard";
-import ProfileSetup from "./pages/ProfileSetup";
-
-import ProtectedRoute from "./components/ProtectedRoute";
-import CreatorRoute from "./components/CreatorRoute";
+import AdminDashboard from "./pages/AdminDashboard";
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* =========================
-            LOGIN
-        ========================= */}
+    <Routes>
+      {/* Authentication */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/otp" element={<OTP />} />
 
-        <Route path="/login" element={<Login />} />
+      {/* Home */}
+      <Route path="/" element={<Home />} />
 
-        {/* =========================
-            OTP
-        ========================= */}
+      {/* Movie collection */}
+      <Route path="/movies" element={<Movies />} />
 
-        <Route path="/otp" element={<OTP />} />
+      {/* Movie details: /movies/1, /movies/2, etc. */}
+      <Route path="/movies/:id" element={<MovieDetails />} />
 
-        {/* =========================
-            USER HOME
-        ========================= */}
+      {/* Keep the old URL working too */}
+      <Route path="/movie/:id" element={<MovieDetails />} />
 
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Home />
-            </ProtectedRoute>
-          }
-        />
+      {/* Profile */}
+      <Route path="/profile" element={<Profile />} />
+      <Route path="/profile-setup" element={<ProfileSetup />} />
 
-        {/* =========================
-            MOVIES
-        ========================= */}
+      {/* Creator */}
+      <Route
+        path="/creator-dashboard"
+        element={<CreatorDashboard />}
+      />
 
-        <Route
-          path="/movies"
-          element={
-            <ProtectedRoute>
-              <Movies />
-            </ProtectedRoute>
-          }
-        />
+      {/* Admin */}
+      <Route
+        path="/admin-dashboard"
+        element={<AdminDashboard />}
+      />
 
-        <Route
-          path="/movies/:id"
-          element={
-            <ProtectedRoute>
-              <MovieDetails />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/profile-setup"
-          element={
-            <ProtectedRoute>
-              <ProfileSetup />
-            </ProtectedRoute>
-          }
-        />
+      <Route
+        path="/admin-upload-movie"
+        element={<AdminUploadMovie />}
+      />
 
-        {/* =========================
-            CREATOR DASHBOARD
-        ========================= */}
+      <Route
+        path="/admin/movie-upload"
+        element={<AdminMovieUpload />}
+      />
 
-        <Route
-          path="/creator-dashboard"
-          element={
-            <CreatorRoute>
-              <CreatorDashboard />
-            </CreatorRoute>
-          }
-        />
+      <Route
+        path="/admin-upload"
+        element={<AdminMovieUpload />}
+      />
 
-        {/* =========================
-            UNKNOWN URL
-        ========================= */}
-
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </BrowserRouter>
+      {/* Unknown routes */}
+      <Route
+        path="*"
+        element={<Navigate to="/login" replace />}
+      />
+    </Routes>
   );
 }
 
