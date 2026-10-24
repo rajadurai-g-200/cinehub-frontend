@@ -1,126 +1,310 @@
+/* =========================================
+   CINEHUB OTP VERIFICATION
+========================================= */
+
 .otp-page {
   min-height: 100vh;
+  width: 100%;
+  box-sizing: border-box;
   display: flex;
-  justify-content: center;
   align-items: center;
-
-  padding: 20px;
+  justify-content: center;
+  padding: 24px;
 
   background:
     radial-gradient(
-      circle at 50% 0%,
-      rgba(229, 9, 20, 0.18),
-      transparent 40%
+      ellipse at 50% 10%,
+      rgba(229, 9, 20, 0.17),
+      transparent 45%
     ),
-    #030303;
+    #050505;
+
+  color: #fff;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.otp-page *,
+.otp-page *::before,
+.otp-page *::after {
+  box-sizing: border-box;
 }
 
 .otp-card {
   width: 100%;
-  max-width: 430px;
+  max-width: 440px;
+  padding: 42px 36px;
 
-  padding: 42px 35px;
-
-  background: rgba(15, 15, 15, 0.95);
-
-  border: 1px solid #242424;
+  background: linear-gradient(145deg, #151515, #0b0b0b);
+  border: 1px solid #292929;
   border-radius: 22px;
 
   text-align: center;
 
-  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
+  box-shadow:
+    0 25px 80px rgba(0, 0, 0, 0.65),
+    0 0 35px rgba(229, 9, 20, 0.05);
+
+  animation: otp-appear 0.45s ease-out;
 }
 
-.otp-icon {
-  width: 70px;
-  height: 70px;
+/* ICON */
 
-  margin: 0 auto 20px;
+.otp-icon {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 22px;
 
   display: flex;
   align-items: center;
   justify-content: center;
 
-  border-radius: 50%;
-
   background: rgba(229, 9, 20, 0.1);
+  border: 1px solid rgba(229, 9, 20, 0.25);
+  border-radius: 22px;
 
-  font-size: 30px;
+  font-size: 34px;
+
+  box-shadow: 0 0 30px rgba(229, 9, 20, 0.08);
 }
+
+/* HEADING */
 
 .otp-card h1 {
-  font-size: 27px;
-  margin-bottom: 8px;
+  margin: 0 0 12px;
+
+  color: #fff;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.7px;
 }
 
-.otp-card p {
-  color: #777;
+.otp-text {
+  margin: 0 0 8px;
+
+  color: #999;
   font-size: 14px;
-  line-height: 1.6;
+  line-height: 1.7;
 }
 
-.otp-input {
-  width: 100%;
+.user-email {
+  display: block;
+  margin-bottom: 30px;
 
-  margin: 25px 0;
-
-  padding: 17px;
-
-  background: #101010;
-  border: 1px solid #2c2c2c;
-  border-radius: 12px;
-
-  color: white;
-
-  text-align: center;
-
-  font-size: 28px;
+  color: #ff525b;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 10px;
 
-  outline: none;
+  overflow-wrap: anywhere;
 }
 
-.otp-input:focus {
-  border-color: #e50914;
-  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.1);
-}
+/* FORM */
 
-.otp-button {
+.otp-card form {
   width: 100%;
+  text-align: left;
+}
 
-  padding: 15px;
+.otp-card form label {
+  display: block;
+  margin-bottom: 11px;
 
-  border: none;
+  color: #ddd;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* OTP INPUT */
+
+.otp-card form input {
+  display: block;
+  width: 100%;
+  height: 66px;
+  margin: 0 0 20px;
+  padding: 12px;
+
+  background: #090909;
+  border: 1px solid #333;
+  border-radius: 12px;
+  outline: none;
+
+  color: #fff;
+  font-family: inherit;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 12px;
+  text-align: center;
+  caret-color: #e50914;
+
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    background 0.25s ease;
+}
+
+.otp-card form input::placeholder {
+  color: #454545;
+  opacity: 1;
+}
+
+.otp-card form input:focus {
+  background: #101010;
+  border-color: #e50914;
+
+  box-shadow: 0 0 0 4px rgba(229, 9, 20, 0.12);
+}
+
+.otp-card form input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* VERIFY BUTTON */
+
+.otp-card form button[type="submit"] {
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 18px;
+
+  background: linear-gradient(135deg, #f6121d, #c9000b);
+  border: 1px solid #f6121d;
   border-radius: 11px;
 
-  background: #e50914;
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
 
-  color: white;
+  cursor: pointer;
 
-  font-weight: 700;
+  box-shadow: 0 8px 22px rgba(229, 9, 20, 0.17);
 
-  transition: 0.3s;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
 }
 
-.otp-button:hover {
-  background: #f6121d;
+.otp-card form button[type="submit"]:hover:not(:disabled) {
+  background: #ff202b;
   transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(229, 9, 20, 0.28);
 }
 
-.otp-resend {
-  margin-top: 20px;
-
-  background: transparent;
-  border: none;
-
-  color: #e50914;
-
-  font-weight: 600;
+.otp-card form button[type="submit"]:active:not(:disabled) {
+  transform: scale(0.98);
 }
+
+.otp-card form button[type="submit"]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ERROR MESSAGE */
 
 .otp-error {
-  color: #ff5d66;
-  margin-top: 15px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+
+  background: rgba(255, 60, 70, 0.08);
+  border: 1px solid rgba(255, 80, 90, 0.25);
+  border-radius: 9px;
+
+  color: #ff737b;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+/* CHANGE EMAIL */
+
+.otp-card .change-email {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  min-height: 44px;
+  margin-top: 18px;
+  padding: 10px 14px;
+
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+
+  color: #aaa;
+  font-family: inherit;
   font-size: 13px;
+  font-weight: 700;
+
+  cursor: pointer;
+
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.otp-card .change-email:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.04);
+  border-color: #333;
+}
+
+/* ANIMATION */
+
+@keyframes otp-appear {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ACCESSIBILITY */
+
+@media (prefers-reduced-motion: reduce) {
+  .otp-card,
+  .otp-card * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* MOBILE */
+
+@media (max-width: 480px) {
+  .otp-page {
+    padding: 16px;
+  }
+
+  .otp-card {
+    padding: 32px 22px;
+    border-radius: 18px;
+  }
+
+  .otp-icon {
+    width: 66px;
+    height: 66px;
+    margin-bottom: 19px;
+    border-radius: 18px;
+    font-size: 29px;
+  }
+
+  .otp-card h1 {
+    font-size: 26px;
+  }
+
+  .user-email {
+    font-size: 13px;
+  }
+
+  .otp-card form input {
+    height: 60px;
+    font-size: 25px;
+    letter-spacing: 10px;
+  }
 }

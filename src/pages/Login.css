@@ -1,230 +1,347 @@
-/* ========================================
+
+/* ==========================================
    CINEHUB LOGIN PAGE
-======================================== */
+========================================== */
 
 .login-page {
   min-height: 100vh;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 30px 20px;
+  padding: 28px 18px;
+  box-sizing: border-box;
 
   background:
     radial-gradient(
-      circle at 20% 20%,
-      rgba(229, 9, 20, 0.20),
-      transparent 35%
+      ellipse at 15% 15%,
+      rgba(229, 9, 20, 0.18),
+      transparent 38%
     ),
     radial-gradient(
-      circle at 80% 80%,
-      rgba(150, 0, 0, 0.12),
-      transparent 35%
+      ellipse at 90% 90%,
+      rgba(120, 0, 8, 0.14),
+      transparent 38%
     ),
-    #030303;
+    #050505;
+
+  color: #fff;
+  font-family: Arial, Helvetica, sans-serif;
 }
+
+.login-page *,
+.login-page *::before,
+.login-page *::after {
+  box-sizing: border-box;
+}
+
+/* LOGIN CARD */
 
 .login-card {
   width: 100%;
-  max-width: 470px;
-  padding: 42px;
+  max-width: 460px;
+  padding: 42px 36px;
 
-  background: rgba(15, 15, 15, 0.92);
+  background: linear-gradient(145deg, #171717, #0b0b0b);
   border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 24px;
+  border-radius: 22px;
 
   box-shadow:
-    0 30px 100px rgba(0, 0, 0, 0.7),
-    0 0 50px rgba(229, 9, 20, 0.08);
+    0 28px 85px rgba(0, 0, 0, 0.65),
+    0 0 45px rgba(229, 9, 20, 0.05);
 
-  backdrop-filter: blur(25px);
-
-  animation: loginAppear 0.6s ease;
+  animation: login-appear 0.5s ease-out;
 }
 
-@keyframes loginAppear {
-  from {
-    opacity: 0;
-    transform: translateY(25px) scale(0.97);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
+/* LOGO */
 
 .login-logo {
-  text-align: center;
-  margin-bottom: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.cinehub-logo {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 13px;
+  background: linear-gradient(135deg, #ff2935, #a90009);
+
+  color: white;
+  font-size: 28px;
+  font-weight: 900;
+
+  box-shadow: 0 8px 25px rgba(229, 9, 20, 0.25);
 }
 
 .login-logo h1 {
-  font-family: "Montserrat", sans-serif;
-  font-size: 38px;
-  font-weight: 800;
-  letter-spacing: -1px;
+  margin: 0;
+  color: #fff;
+
+  font-size: 36px;
+  font-weight: 900;
+  letter-spacing: -1.5px;
 }
 
-.login-logo span {
+.login-logo h1 span {
   color: #e50914;
 }
 
-.login-logo p {
-  margin-top: 8px;
-  color: #888;
-  font-size: 14px;
-}
-
-.login-title {
-  text-align: center;
-  font-size: 25px;
-  margin-bottom: 8px;
-}
+/* SUBTITLE */
 
 .login-subtitle {
+  margin: 0 0 32px;
   text-align: center;
-  color: #777;
+
+  color: #999;
   font-size: 14px;
-  margin-bottom: 28px;
+  line-height: 1.7;
 }
+
+/* FORM */
 
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-
-.login-input-group {
-  position: relative;
-}
-
-.login-input-group label {
-  display: block;
-  margin-bottom: 8px;
-  color: #bbb;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.login-input {
+  gap: 12px;
   width: 100%;
-  padding: 15px 16px;
+}
 
-  background: #111;
-  border: 1px solid #292929;
-  border-radius: 12px;
+.login-form label {
+  color: #ddd;
+  font-size: 13px;
+  font-weight: 700;
+}
 
-  color: white;
+.login-form input {
+  width: 100%;
+  min-height: 52px;
+  padding: 14px 15px;
+
+  background: #0a0a0a;
+  border: 1px solid #333;
+  border-radius: 10px;
+
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+
   outline: none;
 
-  transition: 0.25s;
+  transition:
+    border-color 0.25s ease,
+    box-shadow 0.25s ease,
+    background 0.25s ease;
 }
 
-.login-input::placeholder {
-  color: #555;
+.login-form input::placeholder {
+  color: #666;
 }
 
-.login-input:focus {
+.login-form input:focus {
+  background: #101010;
   border-color: #e50914;
-  box-shadow: 0 0 0 3px rgba(229, 9, 20, 0.10);
+  box-shadow: 0 0 0 4px rgba(229, 9, 20, 0.1);
 }
 
-.login-button {
-  width: 100%;
-  padding: 15px;
-  border: none;
-  border-radius: 12px;
-
-  background: linear-gradient(
-    135deg,
-    #e50914,
-    #b20710
-  );
-
-  color: white;
-  font-size: 15px;
-  font-weight: 700;
-
-  transition: 0.3s;
-}
-
-.login-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 30px rgba(229, 9, 20, 0.25);
-}
-
-.login-button:disabled {
+.login-form input:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
+/* GMAIL OTP BUTTON */
+
+.login-form .otp-button {
+  width: 100%;
+  min-height: 52px;
+  margin-top: 7px;
+  padding: 14px 18px;
+
+  border: 1px solid #e50914;
+  border-radius: 10px;
+
+  background: linear-gradient(135deg, #f6121d, #c9000b);
+
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 800;
+
+  cursor: pointer;
+
+  box-shadow: 0 8px 22px rgba(229, 9, 20, 0.15);
+
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+.login-form .otp-button:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ff2935, #e50914);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(229, 9, 20, 0.25);
+}
+
+.login-form .otp-button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.login-form .otp-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* OR DIVIDER */
+
 .login-divider {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
+  margin: 26px 0;
 
-  margin: 25px 0;
-
-  color: #666;
-  font-size: 12px;
+  color: #777;
 }
 
-.login-divider::before,
-.login-divider::after {
-  content: "";
+.login-divider span {
   flex: 1;
   height: 1px;
-  background: #292929;
+  background: #303030;
 }
 
-.google-login {
-  display: flex;
-  justify-content: center;
+.login-divider p {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+
+/* GOOGLE LOGIN */
+
+.google-login-container {
   width: 100%;
+  min-height: 44px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  overflow: hidden;
 }
 
-.login-error {
-  background: rgba(229, 9, 20, 0.08);
-  border: 1px solid rgba(229, 9, 20, 0.25);
+.google-login-container > div {
+  max-width: 100%;
+}
 
-  color: #ff6970;
+.google-login-container p {
+  margin: 12px 0;
+  color: #bbb;
+  font-size: 13px;
+  text-align: center;
+}
 
-  padding: 12px 14px;
+/* STATUS MESSAGE */
+
+.login-message {
+  margin-top: 20px;
+  padding: 13px 14px;
+
   border-radius: 10px;
 
   font-size: 13px;
-  margin-bottom: 15px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
 }
+
+.login-message.error {
+  color: #ff737b;
+  background: rgba(229, 9, 20, 0.08);
+  border: 1px solid rgba(229, 9, 20, 0.25);
+}
+
+.login-message.success {
+  color: #6ee7a0;
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+/* FOOTER */
 
 .login-footer {
+  margin: 27px 0 0;
+  color: #696969;
+
+  font-size: 11px;
+  line-height: 1.8;
   text-align: center;
-  color: #555;
-  font-size: 12px;
-  margin-top: 25px;
 }
 
-.login-security {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
+/* ANIMATION */
 
-  margin-top: 18px;
+@keyframes login-appear {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
 
-  color: #777;
-  font-size: 12px;
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
-@media (max-width: 600px) {
+/* ACCESSIBILITY */
+
+@media (prefers-reduced-motion: reduce) {
+  .login-card,
+  .login-card * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* MOBILE */
+
+@media (max-width: 480px) {
   .login-page {
-    padding: 15px;
+    padding: 16px;
   }
 
   .login-card {
-    padding: 28px 20px;
+    padding: 30px 22px;
     border-radius: 18px;
   }
 
+  .cinehub-logo {
+    width: 42px;
+    height: 42px;
+    font-size: 24px;
+    border-radius: 11px;
+  }
+
   .login-logo h1 {
-    font-size: 32px;
+    font-size: 31px;
+  }
+
+  .login-subtitle {
+    margin-bottom: 26px;
+    font-size: 13px;
+  }
+
+  .login-form input {
+    min-height: 50px;
+  }
+
+  .login-form .otp-button {
+    min-height: 50px;
   }
 }

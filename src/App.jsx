@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 
+import RoleSelection from "./pages/RoleSelection";
 import AdminMovieUpload from "./pages/AdminMovieUpload";
 import AdminUploadMovie from "./pages/AdminUploadMovie";
 import Profile from "./pages/Profile";
@@ -36,37 +37,22 @@ function App() {
       <Route path="/profile-setup" element={<ProfileSetup />} />
 
       {/* Creator */}
-      <Route
-        path="/creator-dashboard"
-        element={<CreatorDashboard />}
-      />
+      <Route path="/creator-dashboard" element={<CreatorDashboard />} />
 
       {/* Admin */}
-      <Route
-        path="/admin-dashboard"
-        element={<AdminDashboard />}
-      />
+      <Route path="/admin-dashboard" element={<AdminDashboard />} />
 
-      <Route
-        path="/admin-upload-movie"
-        element={<AdminUploadMovie />}
-      />
+      <Route path="/admin-upload-movie" element={<AdminUploadMovie />} />
 
-      <Route
-        path="/admin/movie-upload"
-        element={<AdminMovieUpload />}
-      />
+      <Route path="/admin/movie-upload" element={<AdminMovieUpload />} />
 
-      <Route
-        path="/admin-upload"
-        element={<AdminMovieUpload />}
-      />
+      <Route path="/admin-upload" element={<AdminMovieUpload />} />
 
       {/* Unknown routes */}
-      <Route
-        path="*"
-        element={<Navigate to="/login" replace />}
-      />
+      <Route path="*" element={<Navigate to="/login" replace />} />
+
+      <Route path="/select-role" element={<RoleSelection />} />
+      
     </Routes>
   );
 }

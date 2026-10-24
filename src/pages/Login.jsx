@@ -100,14 +100,25 @@ function Login() {
         localStorage.removeItem("refreshToken");
       }
 
-      const isAdmin =
+      
+
+      const role = String(user.role || "USER").toUpperCase();
+
+      let destination = "/";
+
+      if (
         user.is_staff === true ||
         user.is_superuser === true ||
-        user.role?.toUpperCase() === "ADMIN";
+        role === "ADMIN"
+      ) {
+        destination = "/admin-dashboard";
+      } else if (data.is_new_user === true) {
+        destination = "/profile-setup";
+      } else if (role === "CREATOR") {
+        destination = "/creator-dashboard";
+      }
 
-      navigate(isAdmin ? "/admin-dashboard" : "/", {
-        replace: true,
-      });
+      navigate(destination, { replace: true });
     } catch (error) {
       console.error(
         "Google login error:",

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 import "./CreatorDashboard.css";
@@ -11,6 +11,43 @@ const initialForm = {
   genres: "",
   language: "TAMIL",
   quality: "FULL_HD",
+  rating: "8.0",
+};
+
+const getList = (data) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.movies)) return data.movies;
+  if (Array.isArray(data?.results)) return data.results;
+  return [];
+};
+
+const formatRating = (rating) => {
+  const value = Number(rating);
+  return Number.isFinite(value) && value >= 0 && value <= 10
+    ? value.toFixed(1)
+    : "0.0";
+};
+
+const getErrorMessage = (err) => {
+  const data = err.response?.data;
+
+  if (typeof data === "string") return data;
+  if (data?.detail) return data.detail;
+  if (data?.message) return data.message;
+  if (data?.error) return data.error;
+
+  if (data && typeof data === "object") {
+    return Object.entries(data)
+      .map(([field, messages]) => {
+        const message = Array.isArray(messages)
+          ? messages.join(", ")
+          : String(messages);
+        return `${field}: ${message}`;
+      })
+      .join(" | ");
+  }
+
+  return err.message || "An unexpected error occurred.";
 };
 
 function CreatorDashboard() {
@@ -18,7 +55,7 @@ function CreatorDashboard() {
 
   const [user, setUser] = useState({});
   const [movies, setMovies] = useState([]);
-  const [form, setForm] = useState(initialForm);
+  const [form, setForm] = useState({ ...initialForm });
 
   const [logo, setLogo] = useState(null);
   const [movieFile, setMovieFile] = useState(null);
@@ -33,6 +70,25 @@ function CreatorDashboard() {
   const [watchMovie, setWatchMovie] = useState(null);
   const [selectedQuality, setSelectedQuality] = useState("");
 
+  const loadMovies = useCallback(async () => {
+    setLoading(true);
+
+    try {
+      const response = await API.get("/movies/my/");
+      setMovies(getList(response.data));
+      setError("");
+    } catch (err) {
+      console.error(
+        "Loading creator movies failed:",
+        err.response?.data || err.message,
+      );
+
+      setError(`Could not load your movies. ${getErrorMessage(err)}`);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const savedUser = localStorage.getItem("user");
 
@@ -45,48 +101,7 @@ function CreatorDashboard() {
     }
 
     loadMovies();
-  }, []);
-
-  // --------------------------------------------------
-  // LOAD CREATOR MOVIES
-  // --------------------------------------------------
-
-  const loadMovies = async () => {
-    setLoading(true);
-
-    try {
-      const response = await API.get("/movies/my/");
-      const data = response.data;
-
-      const list = Array.isArray(data)
-        ? data
-        : Array.isArray(data?.movies)
-          ? data.movies
-          : Array.isArray(data?.results)
-            ? data.results
-            : [];
-
-      setMovies(list);
-      setError("");
-    } catch (err) {
-      console.error(
-        "Loading creator movies failed:",
-        err.response?.data || err.message
-      );
-
-      setError(
-        err.response?.data?.detail ||
-          err.response?.data?.message ||
-          "Could not load your movies. Check the /movies/my/ endpoint."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --------------------------------------------------
-  // FORM HANDLING
-  // --------------------------------------------------
+  }, [loadMovies]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -96,40 +111,6 @@ function CreatorDashboard() {
       [name]: value,
     }));
   };
-
-  const getServerError = (err) => {
-    const data = err.response?.data;
-
-    if (typeof data === "string") {
-      return data;
-    }
-
-    if (data?.detail) {
-      return data.detail;
-    }
-
-    if (data?.message) {
-      return data.message;
-    }
-
-    if (data && typeof data === "object") {
-      return Object.entries(data)
-        .map(([field, messages]) => {
-          const text = Array.isArray(messages)
-            ? messages.join(", ")
-            : String(messages);
-
-          return `${field}: ${text}`;
-        })
-        .join(" | ");
-    }
-
-    return err.message || "An unexpected error occurred.";
-  };
-
-  // --------------------------------------------------
-  // UPLOAD MOVIE
-  // --------------------------------------------------
 
   const handleUpload = async (event) => {
     event.preventDefault();
@@ -148,6 +129,18 @@ function CreatorDashboard() {
       return;
     }
 
+    const rating = Number(form.rating);
+
+    if (
+      !Number.isFinite(rating) ||
+      rating < 0 ||
+      rating > 10 ||
+      Math.round(rating * 10) !== rating * 10
+    ) {
+      setError("Movie rating must be between 0.0 and 10.0, in 0.1 increments.");
+      return;
+    }
+
     if (!logo || !movieFile) {
       setError("Please select both a movie poster and a video file.");
       return;
@@ -158,7 +151,10 @@ function CreatorDashboard() {
       return;
     }
 
-    if (!movieFile.type.startsWith("video/")) {
+    if (
+      !movieFile.type.startsWith("video/") &&
+      !/\.(mp4|webm|mov|mkv)$/i.test(movieFile.name)
+    ) {
       setError("Please select a valid video file.");
       return;
     }
@@ -169,51 +165,36 @@ function CreatorDashboard() {
       formData.append(key, value);
     });
 
+    formData.set("rating", rating.toFixed(1));
     formData.append("logo", logo);
     formData.append("movie_file", movieFile);
 
     setUploading(true);
 
     try {
-      // IMPORTANT:
-      // backend/movies/urls.py defines the creator endpoint as create/
-      // API baseURL should be http://127.0.0.1:8000/api
       await API.post("/movies/create/", formData);
 
-      setSuccess(
-        "Movie submitted successfully for admin review."
-      );
+      setSuccess("Movie submitted successfully for admin review.");
 
       setForm({ ...initialForm });
       setLogo(null);
       setMovieFile(null);
 
-      if (event.currentTarget) {
-        event.currentTarget.reset();
-      }
+      event.currentTarget.reset();
 
       await loadMovies();
       setActiveTab("my-movies");
     } catch (err) {
-      console.error(
-        "Movie upload failed:",
-        err.response?.data || err.message
-      );
+      console.error("Movie upload failed:", err.response?.data || err.message);
 
-      setError(
-        `Movie upload failed: ${getServerError(err)}`
-      );
+      setError(`Movie upload failed: ${getErrorMessage(err)}`);
     } finally {
       setUploading(false);
     }
   };
 
-  // --------------------------------------------------
-  // MOVIE STATUS
-  // --------------------------------------------------
-
   const getStatus = (movie) => {
-    const status = (movie.status || "").toUpperCase();
+    const status = String(movie.status || "").toUpperCase();
 
     if (status === "APPROVED" || movie.is_approved === true) {
       return "Approved";
@@ -227,48 +208,42 @@ function CreatorDashboard() {
   };
 
   const approvedCount = movies.filter(
-    (movie) => getStatus(movie) === "Approved"
+    (movie) => getStatus(movie) === "Approved",
   ).length;
 
   const pendingCount = movies.filter(
-    (movie) => getStatus(movie) === "Pending"
+    (movie) => getStatus(movie) === "Pending",
   ).length;
 
   const filteredMovies = movies.filter((movie) =>
-    (movie.title || "")
+    String(movie.title || "")
       .toLowerCase()
-      .includes(search.toLowerCase())
+      .includes(search.toLowerCase()),
   );
 
   const displayName =
-    user.username ||
-    user.name ||
-    user.email?.split("@")[0] ||
-    "Creator";
+    user.username || user.name || user.email?.split("@")[0] || "Creator";
 
   const initials = displayName.slice(0, 2).toUpperCase();
 
-  // --------------------------------------------------
-  // VIDEO URL HANDLING
-  // --------------------------------------------------
+  const makeMediaUrl = (file) => {
+    if (!file || typeof file !== "string") return "";
+
+    if (/^https?:\/\//i.test(file)) return file;
+
+    const baseURL = API.defaults?.baseURL || "http://127.0.0.1:8000";
+    const base = baseURL.replace(/\/api\/?$/, "").replace(/\/$/, "");
+
+    return `${base}/${file.replace(/^\/+/, "")}`;
+  };
 
   const getAvailableVideos = (movie) => {
     const videos = [];
 
     const addVideo = (quality, file) => {
-      if (typeof file !== "string" || !file.trim()) {
-        return;
-      }
+      if (typeof file !== "string" || !file.trim()) return;
 
-      // Absolute URLs can be used directly.
-      // Relative media paths are resolved against the Django server.
-      let url = file;
-
-      if (file.startsWith("/")) {
-        url = `http://127.0.0.1:8000${file}`;
-      } else if (!/^https?:\/\//i.test(file)) {
-        url = `http://127.0.0.1:8000/${file}`;
-      }
+      const url = makeMediaUrl(file);
 
       if (!videos.some((video) => video.file === url)) {
         videos.push({
@@ -294,7 +269,7 @@ function CreatorDashboard() {
 
     if (videos.length === 0) {
       setError(
-        `No video URL was returned for "${movie.title}". Check the /movies/my/ API response.`
+        `No video URL was returned for "${movie.title}". Check the /movies/my/ API response.`,
       );
       return;
     }
@@ -304,18 +279,12 @@ function CreatorDashboard() {
     setSelectedQuality(videos[0].quality);
   };
 
-  const selectedVideos = watchMovie
-    ? getAvailableVideos(watchMovie)
-    : [];
+  const selectedVideos = watchMovie ? getAvailableVideos(watchMovie) : [];
 
   const selectedVideo =
-    selectedVideos.find(
-      (video) => video.quality === selectedQuality
-    ) || selectedVideos[0] || null;
-
-  // --------------------------------------------------
-  // LOGOUT
-  // --------------------------------------------------
+    selectedVideos.find((video) => video.quality === selectedQuality) ||
+    selectedVideos[0] ||
+    null;
 
   const logout = () => {
     localStorage.removeItem("accessToken");
@@ -326,10 +295,6 @@ function CreatorDashboard() {
     navigate("/login");
   };
 
-  // --------------------------------------------------
-  // REUSABLE MOVIE ACTION
-  // --------------------------------------------------
-
   const WatchButton = ({ movie }) => (
     <button
       className="creator-primary-button"
@@ -339,10 +304,6 @@ function CreatorDashboard() {
       ▶ Watch Movie
     </button>
   );
-
-  // --------------------------------------------------
-  // UI
-  // --------------------------------------------------
 
   return (
     <div className="creator-dashboard">
@@ -367,9 +328,7 @@ function CreatorDashboard() {
         ].map(([tab, icon, label]) => (
           <button
             key={tab}
-            className={`creator-nav ${
-              activeTab === tab ? "active" : ""
-            }`}
+            className={`creator-nav ${activeTab === tab ? "active" : ""}`}
             onClick={() => setActiveTab(tab)}
             type="button"
           >
@@ -382,9 +341,7 @@ function CreatorDashboard() {
           </button>
         ))}
 
-        <div className="sidebar-label sidebar-bottom-label">
-          ACCOUNT
-        </div>
+        <div className="sidebar-label sidebar-bottom-label">ACCOUNT</div>
 
         <button
           className="creator-nav"
@@ -424,9 +381,7 @@ function CreatorDashboard() {
       <main className="creator-main">
         <header className="creator-topbar">
           <div>
-            <div className="creator-breadcrumb">
-              CineHub / Creator Studio
-            </div>
+            <div className="creator-breadcrumb">CineHub / Creator Studio</div>
 
             <h1>
               {activeTab === "upload"
@@ -439,9 +394,7 @@ function CreatorDashboard() {
 
           <div className="creator-top-actions">
             <span className="creator-live-dot" />
-            <span className="creator-online-text">
-              Creator Workspace
-            </span>
+            <span className="creator-online-text">Creator Workspace</span>
 
             <button
               className="creator-profile-button"
@@ -454,16 +407,14 @@ function CreatorDashboard() {
         </header>
 
         {error && (
-          <div
-            className="creator-alert creator-alert-error"
-            role="alert"
-          >
+          <div className="creator-alert creator-alert-error" role="alert">
             <span>!</span>
             <p>{error}</p>
 
             <button
               onClick={() => setError("")}
               type="button"
+              aria-label="Dismiss error"
             >
               ×
             </button>
@@ -471,23 +422,19 @@ function CreatorDashboard() {
         )}
 
         {success && (
-          <div
-            className="creator-alert creator-alert-success"
-            role="status"
-          >
+          <div className="creator-alert creator-alert-success" role="status">
             <span>✓</span>
             <p>{success}</p>
 
             <button
               onClick={() => setSuccess("")}
               type="button"
+              aria-label="Dismiss success message"
             >
               ×
             </button>
           </div>
         )}
-
-        {/* OVERVIEW */}
 
         {activeTab === "overview" && (
           <>
@@ -495,17 +442,15 @@ function CreatorDashboard() {
               <div className="welcome-decoration">C</div>
 
               <div className="welcome-content">
-                <span className="welcome-eyebrow">
-                  YOUR CREATIVE SPACE
-                </span>
+                <span className="welcome-eyebrow">YOUR CREATIVE SPACE</span>
 
                 <h2>
                   Lights. Camera. <span>Creator!</span>
                 </h2>
 
                 <p>
-                  Upload your films, track reviews, and manage
-                  your CineHub submissions.
+                  Upload your films, track reviews, and manage your CineHub
+                  submissions.
                 </p>
 
                 <button
@@ -526,7 +471,6 @@ function CreatorDashboard() {
                   <span>Total Movies</span>
                   <span className="stat-icon purple">▤</span>
                 </div>
-
                 <strong>{movies.length}</strong>
                 <small>Your submitted titles</small>
               </div>
@@ -536,7 +480,6 @@ function CreatorDashboard() {
                   <span>Approved</span>
                   <span className="stat-icon green">✓</span>
                 </div>
-
                 <strong>{approvedCount}</strong>
                 <small>Approved for publishing</small>
               </div>
@@ -546,7 +489,6 @@ function CreatorDashboard() {
                   <span>Under Review</span>
                   <span className="stat-icon orange">◷</span>
                 </div>
-
                 <strong>{pendingCount}</strong>
                 <small>Awaiting admin review</small>
               </div>
@@ -556,9 +498,7 @@ function CreatorDashboard() {
               <div className="creator-section-heading">
                 <div>
                   <h2>Recent Movies</h2>
-                  <p>
-                    Track your latest submissions and preview your videos.
-                  </p>
+                  <p>Track your latest submissions and preview your videos.</p>
                 </div>
 
                 <button
@@ -571,16 +511,12 @@ function CreatorDashboard() {
               </div>
 
               {loading ? (
-                <div className="creator-empty">
-                  Loading your movies...
-                </div>
+                <div className="creator-empty">Loading your movies...</div>
               ) : movies.length === 0 ? (
                 <div className="creator-empty">
                   <div className="empty-film">🎞</div>
                   <h3>Your first movie starts here</h3>
-                  <p>
-                    Upload a movie to begin your CineHub journey.
-                  </p>
+                  <p>Upload a movie to begin your CineHub journey.</p>
 
                   <button
                     className="creator-primary-button"
@@ -598,6 +534,7 @@ function CreatorDashboard() {
                         <th>MOVIE</th>
                         <th>LANGUAGE</th>
                         <th>QUALITY</th>
+                        <th>RATING</th>
                         <th>STATUS</th>
                         <th>ACTION</th>
                       </tr>
@@ -609,26 +546,29 @@ function CreatorDashboard() {
                           <td>
                             <div className="movie-title-cell">
                               <img
-                                src={movie.logo || movie.thumbnail || ""}
+                                src={makeMediaUrl(
+                                  movie.logo || movie.thumbnail,
+                                )}
                                 alt=""
                                 onError={(event) => {
                                   event.currentTarget.style.display = "none";
                                 }}
                               />
-
-                              <strong>
-                                {movie.title || "Untitled Movie"}
-                              </strong>
+                              <strong>{movie.title || "Untitled Movie"}</strong>
                             </div>
                           </td>
 
                           <td>{movie.language || "—"}</td>
                           <td>{movie.quality || "—"}</td>
 
+                          <td className="creator-rating-cell">
+                            ⭐ {formatRating(movie.rating)} / 10
+                          </td>
+
                           <td>
                             <span
                               className={`creator-status ${getStatus(
-                                movie
+                                movie,
                               ).toLowerCase()}`}
                             >
                               {getStatus(movie)}
@@ -648,27 +588,18 @@ function CreatorDashboard() {
           </>
         )}
 
-        {/* UPLOAD */}
-
         {activeTab === "upload" && (
           <section className="creator-content-card upload-content-card">
             <div className="creator-section-heading">
               <div>
                 <h2>Submit Your Movie</h2>
-                <p>
-                  Add your movie details and submit it for admin review.
-                </p>
+                <p>Add your movie details and submit it for admin review.</p>
               </div>
 
-              <span className="submission-badge">
-                ADMIN REVIEW REQUIRED
-              </span>
+              <span className="submission-badge">ADMIN REVIEW REQUIRED</span>
             </div>
 
-            <form
-              className="creator-upload-form"
-              onSubmit={handleUpload}
-            >
+            <form className="creator-upload-form" onSubmit={handleUpload}>
               <div className="upload-section-label">
                 <span>01</span> Movie Information
               </div>
@@ -676,7 +607,6 @@ function CreatorDashboard() {
               <div className="creator-form-grid">
                 <div className="creator-field full-width">
                   <label htmlFor="title">Movie Title *</label>
-
                   <input
                     id="title"
                     name="title"
@@ -688,7 +618,6 @@ function CreatorDashboard() {
 
                 <div className="creator-field">
                   <label htmlFor="director">Director *</label>
-
                   <input
                     id="director"
                     name="director"
@@ -700,7 +629,6 @@ function CreatorDashboard() {
 
                 <div className="creator-field">
                   <label htmlFor="starring">Starring *</label>
-
                   <input
                     id="starring"
                     name="starring"
@@ -711,10 +639,7 @@ function CreatorDashboard() {
                 </div>
 
                 <div className="creator-field">
-                  <label htmlFor="release_date">
-                    Release Date *
-                  </label>
-
+                  <label htmlFor="release_date">Release Date *</label>
                   <input
                     id="release_date"
                     name="release_date"
@@ -727,7 +652,6 @@ function CreatorDashboard() {
 
                 <div className="creator-field">
                   <label htmlFor="genres">Genres *</label>
-
                   <input
                     id="genres"
                     name="genres"
@@ -740,7 +664,6 @@ function CreatorDashboard() {
 
                 <div className="creator-field">
                   <label htmlFor="language">Language</label>
-
                   <select
                     id="language"
                     name="language"
@@ -754,7 +677,6 @@ function CreatorDashboard() {
 
                 <div className="creator-field">
                   <label htmlFor="quality">Default Quality</label>
-
                   <select
                     id="quality"
                     name="quality"
@@ -765,6 +687,28 @@ function CreatorDashboard() {
                     <option value="HD">HD</option>
                   </select>
                 </div>
+
+                <div className="creator-field">
+                  <label htmlFor="rating">Movie Rating (out of 10) *</label>
+
+                  <select
+                    id="rating"
+                    name="rating"
+                    value={form.rating}
+                    onChange={handleChange}
+                    required
+                  >
+                    {Array.from({ length: 101 }, (_, index) => {
+                      const value = (index / 10).toFixed(1);
+
+                      return (
+                        <option key={value} value={value}>
+                          ⭐ {value} / 10
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
               </div>
 
               <div className="upload-section-label">
@@ -773,19 +717,12 @@ function CreatorDashboard() {
 
               <div className="creator-form-grid">
                 <div className="creator-field">
-                  <label htmlFor="logo">
-                    Movie Poster / Logo *
-                  </label>
+                  <label htmlFor="logo">Movie Poster / Logo *</label>
 
-                  <label
-                    className="creator-file-drop"
-                    htmlFor="logo"
-                  >
+                  <label className="creator-file-drop" htmlFor="logo">
                     <span className="file-drop-icon">▧</span>
 
-                    <strong>
-                      {logo ? logo.name : "Choose poster image"}
-                    </strong>
+                    <strong>{logo ? logo.name : "Choose poster image"}</strong>
 
                     <small>PNG, JPG, WEBP</small>
 
@@ -802,30 +739,21 @@ function CreatorDashboard() {
                 </div>
 
                 <div className="creator-field">
-                  <label htmlFor="movie-file">
-                    Movie Video *
-                  </label>
+                  <label htmlFor="movie-file">Movie Video *</label>
 
-                  <label
-                    className="creator-file-drop"
-                    htmlFor="movie-file"
-                  >
+                  <label className="creator-file-drop" htmlFor="movie-file">
                     <span className="file-drop-icon">▷</span>
 
                     <strong>
-                      {movieFile
-                        ? movieFile.name
-                        : "Choose movie video"}
+                      {movieFile ? movieFile.name : "Choose movie video"}
                     </strong>
 
-                    <small>
-                      MP4 with H.264 video is recommended
-                    </small>
+                    <small>MP4 with H.264 video is recommended</small>
 
                     <input
                       id="movie-file"
                       type="file"
-                      accept="video/mp4,video/webm,video/quicktime"
+                      accept="video/mp4,video/webm,video/quicktime,video/x-matroska"
                       onChange={(event) =>
                         setMovieFile(event.target.files?.[0] || null)
                       }
@@ -837,11 +765,9 @@ function CreatorDashboard() {
 
               <div className="creator-upload-note">
                 <span>ⓘ</span>
-
                 <p>
-                  Your movie needs admin approval before public
-                  publishing. You can preview your own submission
-                  in Creator Studio.
+                  Your movie needs admin approval before public publishing. You
+                  can preview your own submission in Creator Studio.
                 </p>
               </div>
 
@@ -860,25 +786,19 @@ function CreatorDashboard() {
                   className="creator-primary-button"
                   disabled={uploading}
                 >
-                  {uploading
-                    ? "Submitting..."
-                    : "Submit for Approval →"}
+                  {uploading ? "Submitting..." : "Submit for Approval →"}
                 </button>
               </div>
             </form>
           </section>
         )}
 
-        {/* MY MOVIES */}
-
         {activeTab === "my-movies" && (
           <section className="creator-content-card">
             <div className="creator-section-heading creator-movies-heading">
               <div>
                 <h2>My Movie Library</h2>
-                <p>
-                  Preview and monitor all your submissions.
-                </p>
+                <p>Preview and monitor all your submissions.</p>
               </div>
 
               <button
@@ -909,9 +829,7 @@ function CreatorDashboard() {
             </div>
 
             {loading ? (
-              <div className="creator-empty">
-                Loading your movies...
-              </div>
+              <div className="creator-empty">Loading your movies...</div>
             ) : filteredMovies.length === 0 ? (
               <div className="creator-empty">
                 <div className="empty-film">🎬</div>
@@ -921,14 +839,11 @@ function CreatorDashboard() {
             ) : (
               <div className="creator-movie-grid">
                 {filteredMovies.map((movie) => (
-                  <article
-                    className="creator-movie-card"
-                    key={movie.id}
-                  >
+                  <article className="creator-movie-card" key={movie.id}>
                     <div className="creator-movie-poster">
                       {movie.logo || movie.thumbnail ? (
                         <img
-                          src={movie.logo || movie.thumbnail}
+                          src={makeMediaUrl(movie.logo || movie.thumbnail)}
                           alt={movie.title || "Movie poster"}
                         />
                       ) : (
@@ -937,7 +852,7 @@ function CreatorDashboard() {
 
                       <span
                         className={`creator-status ${getStatus(
-                          movie
+                          movie,
                         ).toLowerCase()}`}
                       >
                         {getStatus(movie)}
@@ -945,9 +860,7 @@ function CreatorDashboard() {
                     </div>
 
                     <div className="creator-movie-info">
-                      <h3>
-                        {movie.title || "Untitled Movie"}
-                      </h3>
+                      <h3>{movie.title || "Untitled Movie"}</h3>
 
                       <p>
                         {movie.language || "Language not set"} ·{" "}
@@ -955,9 +868,18 @@ function CreatorDashboard() {
                       </p>
 
                       <small>
-                        {movie.release_date ||
-                          "Release date not provided"}
+                        {movie.release_date || "Release date not provided"}
                       </small>
+
+                      <p className="creator-movie-rating">
+                        ⭐ {formatRating(movie.rating)} / 10
+                      </p>
+
+                      {movie.admin_message && (
+                        <p className="creator-admin-message">
+                          Admin message: {movie.admin_message}
+                        </p>
+                      )}
 
                       <WatchButton movie={movie} />
                     </div>
@@ -968,8 +890,6 @@ function CreatorDashboard() {
           </section>
         )}
       </main>
-
-      {/* VIDEO PLAYER MODAL */}
 
       {watchMovie && (
         <div
@@ -990,10 +910,8 @@ function CreatorDashboard() {
             <div className="creator-player-header">
               <div>
                 <h2>{watchMovie.title || "Watch Movie"}</h2>
-
-                <p>
-                  Creator preview · {getStatus(watchMovie)}
-                </p>
+                <p>Creator preview · {getStatus(watchMovie)}</p>
+                <p>⭐ {formatRating(watchMovie.rating)} / 10</p>
               </div>
 
               <button
@@ -1007,22 +925,15 @@ function CreatorDashboard() {
 
             {selectedVideos.length > 1 && (
               <div className="creator-quality-picker">
-                <label htmlFor="watch-quality">
-                  Video quality
-                </label>
+                <label htmlFor="watch-quality">Video quality</label>
 
                 <select
                   id="watch-quality"
                   value={selectedVideo?.quality || selectedQuality}
-                  onChange={(event) =>
-                    setSelectedQuality(event.target.value)
-                  }
+                  onChange={(event) => setSelectedQuality(event.target.value)}
                 >
                   {selectedVideos.map((video) => (
-                    <option
-                      key={video.file}
-                      value={video.quality}
-                    >
+                    <option key={video.file} value={video.quality}>
                       {video.quality}
                     </option>
                   ))}
@@ -1039,25 +950,19 @@ function CreatorDashboard() {
                   autoPlay
                   playsInline
                   preload="metadata"
-                  onError={(event) => {
-                    console.error("Video playback failed:", {
-                      url: selectedVideo.file,
-                      mediaError: event.currentTarget.error,
-                    });
-
+                  onError={() => {
                     setError(
-                      "Video playback failed. Check the video URL and the media request in the browser Network tab."
+                      "Video playback failed. Check that the uploaded file exists and uses a browser-supported video codec.",
                     );
                   }}
                 >
                   <source src={selectedVideo.file} />
-
                   Your browser does not support HTML video.
                 </video>
 
                 <p className="creator-player-help">
-                  If the video does not play, check that the uploaded
-                  file exists and uses a browser-supported video codec.
+                  If the video does not play, check that the uploaded file
+                  exists and uses a browser-supported video codec.
                 </p>
               </>
             ) : (

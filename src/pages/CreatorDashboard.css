@@ -1368,3 +1368,19 @@
   }
 }
 
+
+
+.creator-movie-rating {
+  margin: 10px 0;
+  color: #ffc857;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.creator-rating-cell {
+  color: #ffc857;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+

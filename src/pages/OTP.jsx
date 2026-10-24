@@ -3,23 +3,42 @@ import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 import "./OTP.css";
 
+function getDestination(user, isNewUser = false) {
+  const role = String(user?.role || "USER").toUpperCase();
+
+  if (
+    user?.is_staff === true ||
+    user?.is_superuser === true ||
+    role === "ADMIN"
+  ) {
+    return "/admin-dashboard";
+  }
+
+  if (isNewUser) {
+    return "/profile-setup";
+  }
+
+  if (role === "CREATOR") {
+    return "/creator-dashboard";
+  }
+
+  return "/";
+}
+
 function OTP() {
   const navigate = useNavigate();
-
-  // Get email saved by Login.jsx
   const email = localStorage.getItem("loginEmail") || "";
 
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // VERIFY OTP
-  const handleVerifyOTP = async (e) => {
-    e.preventDefault();
+  const handleVerifyOTP = async (event) => {
+    event.preventDefault();
     setError("");
 
     if (!email) {
-      setError("Email not found. Please go back and login again.");
+      setError("Email not found. Please go back and log in again.");
       return;
     }
 
@@ -36,21 +55,18 @@ function OTP() {
         otp,
       });
 
-      console.log("OTP verification response:", response.data);
-
       const data = response.data;
-
-      // Support either access/refresh or accessToken/refreshToken
       const accessToken = data.access || data.accessToken;
       const refreshToken = data.refresh || data.refreshToken;
+      const user = data.user;
 
-      if (!accessToken) {
-        setError("Access token was not received from the server.");
+      if (!accessToken || !user) {
+        setError("The server did not return complete login details.");
         return;
       }
 
-      // Save JWT tokens
       localStorage.setItem("accessToken", accessToken);
+      localStorage.setItem("user", JSON.stringify(user));
 
       if (refreshToken) {
         localStorage.setItem("refreshToken", refreshToken);
@@ -58,46 +74,30 @@ function OTP() {
         localStorage.removeItem("refreshToken");
       }
 
-      // Save user information if returned
-      if (data.user) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-      }
-
-      // Remove temporary login email only after successful verification
       localStorage.removeItem("loginEmail");
 
-      // Redirect based on server-provided role
-      const user = data.user || {};
-
-      if (
-        user.is_staff === true ||
-        user.is_superuser === true ||
-        user.role === "ADMIN"
-      ) {
-        navigate("/admin-dashboard");
-      } else {
-        navigate("/profile-setup");
-      }
+      navigate(getDestination(user, data.is_new_user === true), {
+        replace: true,
+      });
     } catch (err) {
-      console.error("OTP verification error:", err);
-      console.error("Server response:", err.response?.data);
+      console.error(
+        "OTP verification error:",
+        err.response?.data || err.message
+      );
 
-      if (err.response?.status === 400) {
-        setError(
-          err.response?.data?.message ||
-            err.response?.data?.error ||
-            "Invalid or expired OTP."
-        );
-      } else if (err.response?.status === 401) {
+      const statusCode = err.response?.status;
+      const serverMessage =
+        err.response?.data?.message ||
+        err.response?.data?.error;
+
+      if (statusCode === 400) {
+        setError(serverMessage || "Invalid or expired OTP.");
+      } else if (statusCode === 401) {
         setError("Authentication failed. Please request a new OTP.");
-      } else if (err.response?.status >= 500) {
-        setError("Server error. Please try again later.");
+      } else if (statusCode >= 500) {
+        setError(serverMessage || "Server error. Please try again later.");
       } else {
-        setError(
-          err.response?.data?.message ||
-            err.response?.data?.error ||
-            "Unable to verify OTP. Please try again."
-        );
+        setError(serverMessage || "Unable to verify OTP. Please try again.");
       }
 
       setOtp("");
@@ -106,27 +106,17 @@ function OTP() {
     }
   };
 
-  // CHANGE EMAIL
   const handleChangeEmail = () => {
     localStorage.removeItem("loginEmail");
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
-
     setOtp("");
     setError("");
-
     navigate("/login");
   };
 
-  // OTP INPUT
-  const handleOTPChange = (e) => {
-    const value = e.target.value.replace(/\D/g, "");
-
-    if (value.length <= 6) {
-      setOtp(value);
-      setError("");
-    }
+  const handleOTPChange = (event) => {
+    const value = event.target.value.replace(/\D/g, "").slice(0, 6);
+    setOtp(value);
+    setError("");
   };
 
   return (
@@ -136,9 +126,7 @@ function OTP() {
 
         <h1>Verify OTP</h1>
 
-        <p className="otp-text">
-          We sent a 6-digit OTP to
-        </p>
+        <p className="otp-text">We sent a 6-digit OTP to</p>
 
         <strong className="user-email">
           {email || "your Gmail"}
@@ -155,15 +143,15 @@ function OTP() {
             maxLength={6}
             placeholder="000000"
             value={otp}
-            autoFocus
             autoComplete="one-time-code"
+            autoFocus
             onChange={handleOTPChange}
             disabled={loading || !email}
             required
           />
 
           {error && (
-            <div className="otp-error">
+            <div className="otp-error" role="alert">
               ❌ {error}
             </div>
           )}
@@ -189,4 +177,3 @@ function OTP() {
 }
 
 export default OTP;
-

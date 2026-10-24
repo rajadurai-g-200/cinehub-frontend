@@ -3,20 +3,63 @@ import { useNavigate } from "react-router-dom";
 import API from "../services/api";
 import "./AdminDashboard.css";
 
+const INITIAL_STATISTICS = {
+  total_users: 0,
+  total_creators: 0,
+  online_users: 0,
+  online_creators: 0,
+  total_movies: 0,
+  pending_movies: 0,
+  approved_movies: 0,
+  rejected_movies: 0,
+};
+
+const getList = (data, key) => {
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.[key])) return data[key];
+  if (Array.isArray(data?.results)) return data.results;
+  return [];
+};
+
+const formatRating = (rating) => {
+  const value = Number(rating);
+  return Number.isFinite(value) && value >= 0 && value <= 10
+    ? value.toFixed(1)
+    : "0.0";
+};
+
+const formatDate = (date) => {
+  if (!date) return "—";
+  const parsed = new Date(date);
+  return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleString("en-IN");
+};
+
+const getErrorMessage = (err, fallback) => {
+  const data = err.response?.data;
+
+  if (typeof data === "string") return data;
+  if (data?.detail) return data.detail;
+  if (data?.message) return data.message;
+  if (data?.error) return data.error;
+
+  if (data && typeof data === "object") {
+    return Object.entries(data)
+      .map(([field, messages]) => {
+        const message = Array.isArray(messages)
+          ? messages.join(", ")
+          : String(messages);
+        return `${field}: ${message}`;
+      })
+      .join(" | ");
+  }
+
+  return fallback;
+};
+
 function AdminDashboard() {
   const navigate = useNavigate();
 
-  const [statistics, setStatistics] = useState({
-    total_users: 0,
-    total_creators: 0,
-    online_users: 0,
-    online_creators: 0,
-    total_movies: 0,
-    pending_movies: 0,
-    approved_movies: 0,
-    rejected_movies: 0,
-  });
-
+  const [statistics, setStatistics] = useState(INITIAL_STATISTICS);
   const [users, setUsers] = useState([]);
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,46 +69,25 @@ function AdminDashboard() {
   const [reviewLoading, setReviewLoading] = useState(null);
   const [deleteLoading, setDeleteLoading] = useState(null);
 
-  // LOAD STATISTICS
   const loadStatistics = useCallback(async () => {
     const response = await API.get("/auth/admin/statistics/");
-    const data = response.data || {};
-
-    setStatistics((previous) => ({
-      ...previous,
-      ...data,
-    }));
+    setStatistics({
+      ...INITIAL_STATISTICS,
+      ...(response.data || {}),
+    });
   }, []);
 
-  // LOAD USERS
   const loadUsers = useCallback(async () => {
     const response = await API.get("/auth/admin/users/");
-    const data = response.data;
-
-    const list = Array.isArray(data)
-      ? data
-      : data?.users || data?.results || [];
-
-    setUsers(Array.isArray(list) ? list : []);
+    setUsers(getList(response.data, "users"));
   }, []);
 
-  // LOAD MOVIES
   const loadMovies = useCallback(async () => {
     const response = await API.get("/movies/admin/all/");
-    const data = response.data;
-
-    const list = Array.isArray(data)
-      ? data
-      : data?.movies || data?.results || [];
-
-    setMovies(Array.isArray(list) ? list : []);
+    setMovies(getList(response.data, "movies"));
   }, []);
 
-  // LOAD DASHBOARD
   const loadDashboard = useCallback(async () => {
-    setLoading(true);
-    setError("");
-
     const token = localStorage.getItem("accessToken");
 
     if (!token) {
@@ -74,16 +96,15 @@ function AdminDashboard() {
       return;
     }
 
+    setLoading(true);
+    setError("");
+
     try {
-      await Promise.all([
-        loadStatistics(),
-        loadUsers(),
-        loadMovies(),
-      ]);
+      await Promise.all([loadStatistics(), loadUsers(), loadMovies()]);
     } catch (err) {
       console.error(
         "Dashboard loading error:",
-        err.response?.data || err.message
+        err.response?.data || err.message,
       );
 
       if (err.response?.status === 401) {
@@ -92,8 +113,10 @@ function AdminDashboard() {
         setError("Your account does not have admin permission.");
       } else {
         setError(
-          err.response?.data?.detail ||
-            "Unable to load dashboard. Check your Django API endpoints."
+          getErrorMessage(
+            err,
+            "Unable to load dashboard. Check your Django API endpoints.",
+          ),
         );
       }
     } finally {
@@ -105,32 +128,24 @@ function AdminDashboard() {
     loadDashboard();
   }, [loadDashboard]);
 
-  // REFRESH
   const refreshDashboard = async () => {
     setRefreshing(true);
     await loadDashboard();
     setRefreshing(false);
   };
 
-  // UPLOAD MOVIE PAGE
-  const goToUploadMovie = () => {
-    navigate("/admin-upload");
-  };
+  const goToUploadMovie = () => navigate("/admin-upload");
 
-  // MEDIA URL
   const makeMediaUrl = (file) => {
-    if (!file) return "";
+    if (!file || typeof file !== "string") return "";
 
-    if (file.startsWith("http://") || file.startsWith("https://")) {
-      return file;
-    }
+    if (/^https?:\/\//i.test(file)) return file;
 
-    return `http://127.0.0.1:8000${
-      file.startsWith("/") ? file : `/${file}`
-    }`;
+    const baseURL = API.defaults?.baseURL || "http://127.0.0.1:8000";
+    const base = baseURL.replace(/\/api\/?$/, "").replace(/\/$/, "");
+    return `${base}/${file.replace(/^\/+/, "")}`;
   };
 
-  // DELETE MOVIE
   const deleteMovie = async (movieId) => {
     if (!movieId) {
       window.alert("Invalid movie ID.");
@@ -138,9 +153,7 @@ function AdminDashboard() {
     }
 
     if (
-      !window.confirm(
-        "Permanently delete this movie? This cannot be undone."
-      )
+      !window.confirm("Permanently delete this movie? This cannot be undone.")
     ) {
       return;
     }
@@ -152,41 +165,40 @@ function AdminDashboard() {
       await API.delete(`/movies/admin/${movieId}/delete/`);
 
       setMovies((previous) =>
-        previous.filter(
-          (movie) => String(movie.id) !== String(movieId)
-        )
+        previous.filter((movie) => String(movie.id) !== String(movieId)),
       );
 
       await Promise.all([loadStatistics(), loadMovies()]);
       window.alert("Movie deleted successfully.");
     } catch (err) {
-      console.error(
-        "Delete movie error:",
-        err.response?.data || err.message
-      );
+      console.error("Delete movie error:", err.response?.data || err.message);
 
-      window.alert(
-        err.response?.data?.detail ||
-          err.response?.data?.error ||
-          "Unable to delete movie. Check the Django endpoint."
-      );
+      window.alert(getErrorMessage(err, "Unable to delete movie."));
     } finally {
       setDeleteLoading(null);
     }
   };
 
-  // APPROVE OR REJECT MOVIE
   const reviewMovie = async (movieId, status) => {
     let adminMessage = "";
 
     if (status === "REJECTED") {
-      adminMessage =
-        window.prompt("Enter the reason for rejecting this movie:") || "";
+      const enteredMessage = window.prompt(
+        "Enter the reason for rejecting this movie:",
+      );
 
-      if (!adminMessage.trim()) return;
+      if (enteredMessage === null) return;
+
+      adminMessage = enteredMessage.trim();
+
+      if (!adminMessage) {
+        window.alert("Please enter a rejection reason.");
+        return;
+      }
     }
 
     setReviewLoading(movieId);
+    setError("");
 
     try {
       await API.post(`/movies/admin/${movieId}/review/`, {
@@ -199,67 +211,53 @@ function AdminDashboard() {
       window.alert(
         status === "APPROVED"
           ? "Movie approved successfully."
-          : "Movie rejected successfully."
+          : "Movie rejected successfully.",
       );
     } catch (err) {
-      console.error(
-        "Movie review error:",
-        err.response?.data || err.message
-      );
+      console.error("Movie review error:", err.response?.data || err.message);
 
-      window.alert(
-        err.response?.data?.detail ||
-          err.response?.data?.error ||
-          "Unable to update movie status."
-      );
+      window.alert(getErrorMessage(err, "Unable to update movie status."));
     } finally {
       setReviewLoading(null);
     }
   };
 
-  // LOGOUT
   const logout = async () => {
     try {
       await API.post("/auth/logout/");
     } catch (err) {
-      console.log("Logout API error:", err.message);
+      console.warn("Logout API error:", err.message);
+    } finally {
+      localStorage.removeItem("accessToken");
+      localStorage.removeItem("refreshToken");
+      localStorage.removeItem("user");
+      localStorage.removeItem("loginEmail");
+      navigate("/login");
     }
-
-    localStorage.removeItem("accessToken");
-    localStorage.removeItem("refreshToken");
-    localStorage.removeItem("user");
-    localStorage.removeItem("loginEmail");
-
-    navigate("/login");
   };
 
-  // SAFE DATA
   const safeUsers = Array.isArray(users) ? users : [];
   const safeMovies = Array.isArray(movies) ? movies : [];
 
   const pendingMovies = safeMovies.filter(
-    (movie) => String(movie.status || "").toUpperCase() === "PENDING"
+    (movie) => String(movie.status || "").toUpperCase() === "PENDING",
   );
 
   const getRole = (user) => {
-    if (user?.is_superuser || user?.is_staff) return "ADMIN";
-    return user?.role || user?.display_role || "USER";
+    if (
+      user?.is_superuser ||
+      user?.is_staff ||
+      String(user?.role || "").toUpperCase() === "ADMIN"
+    ) {
+      return "ADMIN";
+    }
+
+    return String(user?.role || user?.display_role || "USER").toUpperCase();
   };
 
   const getOnlineStatus = (user) =>
     user?.is_online === true || user?.online === true;
 
-  const formatDate = (date) => {
-    if (!date) return "—";
-
-    const parsed = new Date(date);
-
-    return Number.isNaN(parsed.getTime())
-      ? "—"
-      : parsed.toLocaleString("en-IN");
-  };
-
-  // LOADING SCREEN
   if (loading) {
     return (
       <div className="admin-loading">
@@ -270,8 +268,7 @@ function AdminDashboard() {
     );
   }
 
-  // ERROR SCREEN
-  if (error) {
+  if (error && !movies.length && !users.length) {
     return (
       <div className="admin-error-page">
         <div className="admin-error-card">
@@ -301,14 +298,26 @@ function AdminDashboard() {
     );
   }
 
+  let adminEmail = "Admin account";
+
+  try {
+    adminEmail =
+      JSON.parse(localStorage.getItem("user") || "{}").email || "Admin account";
+  } catch {
+    adminEmail = "Admin account";
+  }
+
   return (
     <div className="admin-dashboard">
       <header className="admin-header">
         <div className="admin-header-left">
           <div className="admin-logo">
             <span className="admin-logo-icon">▶</span>
-            <span>Cine<span>Hub</span></span>
+            <span>
+              Cine<span>Hub</span>
+            </span>
           </div>
+
           <div className="admin-title">
             <span>ADMIN PANEL</span>
           </div>
@@ -319,18 +328,7 @@ function AdminDashboard() {
             <div className="admin-avatar">A</div>
             <div className="admin-profile-info">
               <strong>Administrator</strong>
-              <small>
-                {(() => {
-                  try {
-                    return (
-                      JSON.parse(localStorage.getItem("user") || "{}").email ||
-                      "Admin account"
-                    );
-                  } catch {
-                    return "Admin account";
-                  }
-                })()}
-              </small>
+              <small>{adminEmail}</small>
             </div>
           </div>
 
@@ -372,6 +370,12 @@ function AdminDashboard() {
       </nav>
 
       <main className="admin-main">
+        {error && (
+          <div className="admin-inline-error" role="alert">
+            {error}
+          </div>
+        )}
+
         {activeTab === "overview" && (
           <>
             <section className="admin-welcome">
@@ -405,10 +409,26 @@ function AdminDashboard() {
               </div>
 
               <div className="admin-stats-grid">
-                <StatCard icon="👥" label="Total Users" value={statistics.total_users} />
-                <StatCard icon="🎥" label="Total Creators" value={statistics.total_creators} />
-                <StatCard icon="🟢" label="Online Users" value={statistics.online_users} />
-                <StatCard icon="🟢" label="Online Creators" value={statistics.online_creators} />
+                <StatCard
+                  icon="👥"
+                  label="Total Users"
+                  value={statistics.total_users}
+                />
+                <StatCard
+                  icon="🎥"
+                  label="Total Creators"
+                  value={statistics.total_creators}
+                />
+                <StatCard
+                  icon="🟢"
+                  label="Online Users"
+                  value={statistics.online_users}
+                />
+                <StatCard
+                  icon="🟢"
+                  label="Online Creators"
+                  value={statistics.online_creators}
+                />
               </div>
             </section>
 
@@ -421,10 +441,26 @@ function AdminDashboard() {
               </div>
 
               <div className="admin-stats-grid">
-                <StatCard icon="🎬" label="Total Movies" value={statistics.total_movies} />
-                <StatCard icon="⏳" label="Pending" value={statistics.pending_movies} />
-                <StatCard icon="✓" label="Approved" value={statistics.approved_movies} />
-                <StatCard icon="✕" label="Rejected" value={statistics.rejected_movies} />
+                <StatCard
+                  icon="🎬"
+                  label="Total Movies"
+                  value={statistics.total_movies}
+                />
+                <StatCard
+                  icon="⏳"
+                  label="Pending"
+                  value={statistics.pending_movies}
+                />
+                <StatCard
+                  icon="✓"
+                  label="Approved"
+                  value={statistics.approved_movies}
+                />
+                <StatCard
+                  icon="✕"
+                  label="Rejected"
+                  value={statistics.rejected_movies}
+                />
               </div>
             </section>
           </>
@@ -437,6 +473,7 @@ function AdminDashboard() {
                 <h2>Users & Creators</h2>
                 <p>Registered CineHub members</p>
               </div>
+
               <span className="admin-count">{safeUsers.length} members</span>
             </div>
 
@@ -452,6 +489,7 @@ function AdminDashboard() {
                     <th>Joined</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {safeUsers.length === 0 ? (
                     <tr>
@@ -460,12 +498,12 @@ function AdminDashboard() {
                       </td>
                     </tr>
                   ) : (
-                    safeUsers.map((user) => {
+                    safeUsers.map((user, index) => {
                       const role = getRole(user);
                       const online = getOnlineStatus(user);
 
                       return (
-                        <tr key={user.id}>
+                        <tr key={user.id ?? user.email ?? index}>
                           <td>
                             <div className="admin-user-cell">
                               <div className="admin-user-avatar">
@@ -474,18 +512,28 @@ function AdminDashboard() {
                               <strong>{user.username || "Unknown"}</strong>
                             </div>
                           </td>
+
                           <td>{user.email || "—"}</td>
+
                           <td>
-                            <span className={`admin-role ${role.toLowerCase()}`}>
+                            <span
+                              className={`admin-role ${role.toLowerCase()}`}
+                            >
                               {role}
                             </span>
                           </td>
+
                           <td>
-                            <span className={online ? "admin-online" : "admin-offline"}>
+                            <span
+                              className={
+                                online ? "admin-online" : "admin-offline"
+                              }
+                            >
                               <span />
                               {online ? "Online" : "Offline"}
                             </span>
                           </td>
+
                           <td>{formatDate(user.last_seen)}</td>
                           <td>{formatDate(user.date_joined)}</td>
                         </tr>
@@ -502,7 +550,10 @@ function AdminDashboard() {
           <section className="admin-section">
             <div className="admin-section-title">
               <div>
-                <h2>{activeTab === "pending" ? "Pending Approvals" : "All Movies"}</h2>
+                <h2>
+                  {activeTab === "pending" ? "Pending Approvals" : "All Movies"}
+                </h2>
+
                 <p>
                   {activeTab === "pending"
                     ? "Review movie submissions"
@@ -517,6 +568,7 @@ function AdminDashboard() {
                     : safeMovies.length}{" "}
                   movies
                 </span>
+
                 <button
                   type="button"
                   className="admin-primary-button"
@@ -528,15 +580,20 @@ function AdminDashboard() {
             </div>
 
             <div className="admin-movies-grid">
-              {(activeTab === "pending" ? pendingMovies : safeMovies).length === 0 ? (
+              {(activeTab === "pending" ? pendingMovies : safeMovies).length ===
+              0 ? (
                 <div className="admin-empty-card">
                   <div>🎬</div>
-                  <h3>{activeTab === "pending" ? "All Caught Up" : "No Movies"}</h3>
+                  <h3>
+                    {activeTab === "pending" ? "All Caught Up" : "No Movies"}
+                  </h3>
+
                   <p>
                     {activeTab === "pending"
                       ? "There are no movies waiting for approval."
                       : "No movies have been uploaded yet."}
                   </p>
+
                   {activeTab === "movies" && (
                     <button
                       type="button"
@@ -548,17 +605,19 @@ function AdminDashboard() {
                   )}
                 </div>
               ) : (
-                (activeTab === "pending" ? pendingMovies : safeMovies).map((movie) => (
-                  <MovieAdminCard
-                    key={movie.id}
-                    movie={movie}
-                    makeMediaUrl={makeMediaUrl}
-                    reviewMovie={reviewMovie}
-                    reviewLoading={reviewLoading}
-                    deleteMovie={deleteMovie}
-                    deleteLoading={deleteLoading}
-                  />
-                ))
+                (activeTab === "pending" ? pendingMovies : safeMovies).map(
+                  (movie) => (
+                    <MovieAdminCard
+                      key={movie.id}
+                      movie={movie}
+                      makeMediaUrl={makeMediaUrl}
+                      reviewMovie={reviewMovie}
+                      reviewLoading={reviewLoading}
+                      deleteMovie={deleteMovie}
+                      deleteLoading={deleteLoading}
+                    />
+                  ),
+                )
               )}
             </div>
           </section>
@@ -603,6 +662,9 @@ function MovieAdminCard({
           <img
             src={makeMediaUrl(movie.logo)}
             alt={`${movie.title || "Movie"} poster`}
+            onError={(event) => {
+              event.currentTarget.style.display = "none";
+            }}
           />
         ) : (
           <div className="admin-movie-placeholder">🎬</div>
@@ -628,14 +690,38 @@ function MovieAdminCard({
         </div>
 
         <div className="admin-movie-details">
-          <div><span>Director</span><strong>{movie.director || "Unknown"}</strong></div>
-          <div><span>Language</span><strong>{movie.language || "—"}</strong></div>
-          <div><span>Rating</span><strong>⭐ {movie.rating ?? "0"}</strong></div>
-          <div><span>Release</span><strong>{movie.release_date || "—"}</strong></div>
+          <div>
+            <span>Director</span>
+            <strong>{movie.director || "Unknown"}</strong>
+          </div>
+
+          <div>
+            <span>Language</span>
+            <strong>{movie.language || "—"}</strong>
+          </div>
+
+          <div>
+            <span>Rating</span>
+            <strong>⭐ {formatRating(movie.rating)} / 10</strong>
+          </div>
+
+          <div>
+            <span>Release</span>
+            <strong>{movie.release_date || "—"}</strong>
+          </div>
         </div>
 
-        {movie.genres && <p className="admin-movie-genres"><strong>Genres:</strong> {movie.genres}</p>}
-        {movie.starring && <p className="admin-movie-starring"><strong>Starring:</strong> {movie.starring}</p>}
+        {movie.genres && (
+          <p className="admin-movie-genres">
+            <strong>Genres:</strong> {movie.genres}
+          </p>
+        )}
+
+        {movie.starring && (
+          <p className="admin-movie-starring">
+            <strong>Starring:</strong> {movie.starring}
+          </p>
+        )}
 
         {movie.admin_message && (
           <div className="admin-message">
